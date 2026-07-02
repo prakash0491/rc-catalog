@@ -1,0 +1,146 @@
+// This is a Prisma schema for a generic product catalog platform.
+// It intentionally focuses on data modeling only for the current backend phase.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StockStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+}
+
+enum InquiryStatus {
+  NEW
+  CONTACTED
+  CLOSED
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @db.VarChar(100)
+  slug        String    @unique @db.VarChar(120)
+  description String?   @db.Text
+  image       String?   @db.Text
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@index([isActive])
+  @@index([slug])
+}
+
+model Product {
+  id               String        @id @default(cuid())
+  name             String        @db.VarChar(200)
+  slug             String        @unique @db.VarChar(220)
+  shortDescription String        @db.Text
+  description      String        @db.Text
+  price            Decimal       @db.Decimal(10, 2)
+  categoryId       String
+  featured         Boolean       @default(false)
+  newArrival       Boolean       @default(false)
+  stockStatus      StockStatus   @default(IN_STOCK)
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  category         Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images           ProductImage[]
+  inquiries        Inquiry[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([featured])
+  @@index([newArrival])
+  @@index([stockStatus])
+  @@index([slug])
+}
+
+model ProductImage {
+  id         String   @id @default(cuid())
+  productId  String
+  url        String   @db.Text
+  alt        String?  @db.VarChar(180)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+model Banner {
+  id          String   @id @default(cuid())
+  title       String   @db.VarChar(160)
+  subtitle    String?  @db.Text
+  image       String   @db.Text
+  buttonText  String?  @db.VarChar(80)
+  buttonUrl   String?  @db.Text
+  priority    Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, priority])
+}
+
+model Offer {
+  id          String    @id @default(cuid())
+  title       String    @db.VarChar(160)
+  description String?   @db.Text
+  image       String?   @db.Text
+  priority    Int       @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isActive, priority])
+}
+
+model Inquiry {
+  id        String        @id @default(cuid())
+  name      String        @db.VarChar(120)
+  email     String        @db.VarChar(255)
+  phone     String?       @db.VarChar(40)
+  message   String        @db.Text
+  productId String?
+  status    InquiryStatus @default(NEW)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  product   Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([email])
+}
+
+model BusinessSettings {
+  id               String  @id @default(cuid())
+  businessName     String  @db.VarChar(160)
+  logo             String? @db.Text
+  phone            String? @db.VarChar(40)
+  email            String? @db.VarChar(255)
+  whatsapp         String? @db.VarChar(40)
+  instagram        String? @db.Text
+  facebook         String? @db.Text
+  youtube          String? @db.Text
+  address          String? @db.Text
+  businessHours    String? @db.Text
+  seoTitle         String? @db.VarChar(160)
+  seoDescription   String? @db.Text
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
