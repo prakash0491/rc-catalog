@@ -16,6 +16,7 @@ export async function Navbar() {
           {[
             { label: 'Home', href: '/' },
             { label: 'Products', href: '/products' },
+            { label: 'Categories', href: '/categories' },
             { label: 'About', href: '/about' },
             { label: 'FAQ', href: '/faq' },
             { label: 'Contact', href: '/contact' },
@@ -27,9 +28,9 @@ export async function Navbar() {
         </nav>
 
         <Stack direction="row" gap="sm" className="items-center">
-          <div className="hidden w-64 lg:block">
-            <SearchInput aria-label="Search products" placeholder="Search" />
-          </div>
+          <form action="/products" className="hidden w-64 lg:block">
+            <SearchInput name="search" aria-label="Search products" placeholder="Search products" />
+          </form>
           <Link href="/contact" className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
             Contact
           </Link>

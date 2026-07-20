@@ -1,19 +1,22 @@
 import * as React from 'react';
+import Image, { type ImageProps } from 'next/image';
 
 import { cn } from '@/lib/utils';
 
-type ResponsiveImageProps = React.ImgHTMLAttributes<HTMLImageElement> & {
+type ResponsiveImageProps = Omit<ImageProps, 'width' | 'height'> & {
   containerClassName?: string;
+  width?: number;
+  height?: number;
 };
 
 type CarouselWrapperProps = React.HTMLAttributes<HTMLDivElement>;
 
 type GalleryWrapperProps = React.HTMLAttributes<HTMLDivElement>;
 
-export function ResponsiveImage({ containerClassName, className, ...props }: ResponsiveImageProps) {
+export function ResponsiveImage({ containerClassName, className, width = 800, height = 800, alt, ...props }: ResponsiveImageProps) {
   return (
     <div className={cn('overflow-hidden rounded-xl', containerClassName)}>
-      <img className={cn('h-full w-full object-cover', className)} {...props} />
+      <Image width={width} height={height} alt={alt} className={cn('h-full w-full object-cover', className)} {...props} />
     </div>
   );
 }

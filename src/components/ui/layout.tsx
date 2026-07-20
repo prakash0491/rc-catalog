@@ -4,7 +4,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 type ContainerProps = React.HTMLAttributes<HTMLElement> & {
-  as?: keyof React.JSX.IntrinsicElements;
+  as?: React.ElementType;
 };
 
 export function Container({ as: Component = 'div', className, ...props }: ContainerProps) {
@@ -17,7 +17,7 @@ export function Container({ as: Component = 'div', className, ...props }: Contai
 }
 
 type SectionProps = React.HTMLAttributes<HTMLElement> & {
-  as?: keyof React.JSX.IntrinsicElements;
+  as?: React.ElementType;
   spacing?: 'sm' | 'md' | 'lg';
 };
 
@@ -76,7 +76,7 @@ export function Grid({ cols = 2, gap = 'md', className, ...props }: GridProps) {
   return <div className={cn('grid', colsClass, gapClass, className)} {...props} />;
 }
 
-type PageWrapperProps = React.HTMLAttributes<HTMLElement> & {
+type PageWrapperProps = React.ComponentProps<typeof motion.main> & {
   children: React.ReactNode;
 };
 

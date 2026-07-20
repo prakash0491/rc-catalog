@@ -1,8 +1,5 @@
-"use client";
-
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
 
 import {
   BaseCard,
@@ -10,232 +7,160 @@ import {
   EmptyState,
   Heading,
   Input,
-  Pagination,
   PrimaryButton,
   SecondaryButton,
   Stack,
   Text,
 } from '@/components/ui';
-import { getProductsList, ProductUiShape } from '@/lib/products-api';
+import type { ProductSortOption, PublicProductListItem } from '@/lib/products';
 
-const PRODUCTS_PER_PAGE = 9;
-
-type SortOption = 'featured' | 'newest' | 'price-asc' | 'price-desc' | 'name-asc';
+type CategoryFilter = {
+  id: string;
+  name: string;
+  slug: string;
+  productCount: number;
+};
 
 type ProductCatalogProps = {
-  initialProducts: ProductUiShape[];
+  products: PublicProductListItem[];
+  categories: CategoryFilter[];
   pagination: {
     page: number;
     limit: number;
     total: number;
     totalPages: number;
   };
+  filters: {
+    search?: string;
+    category?: string;
+    sort: ProductSortOption;
+  };
+  whatsappNumber: string;
+  basePath?: string;
+  title?: string;
+  description?: string;
+  breadcrumbItems?: Array<{ label: string; href?: string }>;
+  showCategoryFilters?: boolean;
 };
 
-function formatStockStatus(status: string) {
-  switch (status) {
-    case 'IN_STOCK':
-      return 'In stock';
-    case 'LOW_STOCK':
-      return 'Low stock';
-    case 'OUT_OF_STOCK':
-      return 'Out of stock';
-    default:
-      return status;
-  }
+function formatStockStatus(status: PublicProductListItem['stockStatus']) {
+  if (status === 'in-stock') return 'In stock';
+  if (status === 'low-stock') return 'Low stock';
+  return 'Out of stock';
 }
 
-export function ProductCatalog({ initialProducts, pagination }: ProductCatalogProps) {
-  const [products, setProducts] = useState(initialProducts);
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [sortBy, setSortBy] = useState<SortOption>('featured');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function formatPrice(price: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(price);
+}
 
-  const categories = useMemo(() => {
-    const uniqueCategories = Array.from(new Set(products.map((product) => product.category)));
-    return uniqueCategories.map((name, index) => ({ id: `${name}-${index}`, name, slug: name.toLowerCase() }));
-  }, [products]);
+function buildHref(basePath: string, params: ProductCatalogProps['filters'] & { page?: number }) {
+  const query = new URLSearchParams();
 
-  useEffect(() => {
-    setProducts(initialProducts);
-  }, [initialProducts]);
+  if (params.search) query.set('search', params.search);
+  if (params.category) query.set('category', params.category);
+  if (params.sort && params.sort !== 'featured') query.set('sort', params.sort);
+  if (params.page && params.page > 1) query.set('page', params.page.toString());
 
-  useEffect(() => {
-    let isMounted = true;
+  const queryString = query.toString();
+  return queryString ? `${basePath}?${queryString}` : basePath;
+}
 
-    async function loadProducts() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const params: Record<string, string | undefined> = {
-          search: search || undefined,
-          category: selectedCategory === 'all' ? undefined : selectedCategory,
-          sort: sortBy,
-          page: currentPage.toString(),
-          limit: PRODUCTS_PER_PAGE.toString(),
-        };
-
-        const result = await getProductsList(params);
-        if (isMounted) {
-          setProducts(result.items);
-        }
-      } catch {
-        if (isMounted) {
-          setError('We could not load the catalog right now.');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadProducts();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [search, selectedCategory, sortBy, currentPage]);
-
-  const filteredProducts = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
-    const filtered = products.filter((product) => {
-      const matchesCategory = selectedCategory === 'all' || product.categorySlug === selectedCategory;
-      const matchesSearch = normalizedSearch.length === 0 || product.name.toLowerCase().includes(normalizedSearch);
-
-      return matchesCategory && matchesSearch;
-    });
-
-    const sorted = [...filtered].sort((a, b) => {
-      switch (sortBy) {
-        case 'newest':
-          return Number(b.newArrival) - Number(a.newArrival);
-        case 'price-asc':
-          return a.price - b.price;
-        case 'price-desc':
-          return b.price - a.price;
-        case 'name-asc':
-          return a.name.localeCompare(b.name);
-        case 'featured':
-        default:
-          return Number(b.featured) - Number(a.featured);
-      }
-    });
-
-    return sorted;
-  }, [products, search, selectedCategory, sortBy]);
-
-  const totalPages = Math.max(1, Math.ceil(pagination.total / PRODUCTS_PER_PAGE));
-  const pagedProducts = filteredProducts.slice(
-    (currentPage - 1) * PRODUCTS_PER_PAGE,
-    currentPage * PRODUCTS_PER_PAGE
-  );
-
-  const resetFilters = () => {
-    setSearch('');
-    setSelectedCategory('all');
-    setSortBy('featured');
-    setCurrentPage(1);
-  };
-
+export function ProductCatalog({
+  products,
+  categories,
+  pagination,
+  filters,
+  whatsappNumber,
+  basePath = '/products',
+  title = 'Product catalog',
+  description = 'Browse a thoughtfully curated collection with filtering, sorting, and a polished experience tailored for modern product discovery.',
+  breadcrumbItems = [{ label: 'Home', href: '/' }, { label: 'Products' }],
+  showCategoryFilters = true,
+}: ProductCatalogProps) {
   return (
     <div className="space-y-8">
       <header className="space-y-4">
-        <Breadcrumb
-          items={[{ label: 'Home', href: '/' }, { label: 'Products' }]}
-          className="text-sm"
-        />
+        <Breadcrumb items={breadcrumbItems} className="text-sm" />
         <Stack gap="sm">
           <Heading as="h1" size="h1">
-            Product catalog
+            {title}
           </Heading>
           <Text variant="muted" className="max-w-2xl">
-            Browse a thoughtfully curated collection with filtering, sorting, and a polished experience tailored for modern product discovery.
+            {description}
           </Text>
         </Stack>
       </header>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-slate-700">
-              Search products
-              <Input
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Search by product name"
-                className="mt-2"
-              />
-            </label>
-          </div>
+        <form action={basePath} className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr_auto]">
+          {showCategoryFilters && filters.category ? <input type="hidden" name="category" value={filters.category} /> : null}
+          <label className="block text-sm font-medium text-slate-700">
+            Search products
+            <Input name="search" defaultValue={filters.search ?? ''} placeholder="Search by product name" className="mt-2" />
+          </label>
           <label className="block text-sm font-medium text-slate-700">
             Sort by
             <select
-              value={sortBy}
-              onChange={(event) => {
-                setSortBy(event.target.value as SortOption);
-                setCurrentPage(1);
-              }}
+              name="sort"
+              defaultValue={filters.sort}
               className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="featured">Featured</option>
               <option value="newest">Newest</option>
               <option value="price-asc">Price: Low to High</option>
               <option value="price-desc">Price: High to Low</option>
-              <option value="name-asc">Name A–Z</option>
+              <option value="name-asc">Name A-Z</option>
             </select>
           </label>
-        </div>
+          <div className="flex items-end gap-2">
+            <PrimaryButton type="submit">Apply</PrimaryButton>
+            <Link href={basePath}>
+              <SecondaryButton type="button">Reset</SecondaryButton>
+            </Link>
+          </div>
+        </form>
 
-        <div className="mt-6 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedCategory('all');
-              setCurrentPage(1);
-            }}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${selectedCategory === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-          >
-            All
-          </button>
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              type="button"
-              onClick={() => {
-                setSelectedCategory(category.slug);
-                setCurrentPage(1);
-              }}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${selectedCategory === category.slug ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+        {showCategoryFilters ? (
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Link
+              href={buildHref(basePath, { search: filters.search, sort: filters.sort })}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${!filters.category ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
             >
-              {category.name}
-            </button>
-          ))}
-        </div>
+              All
+            </Link>
+            {categories.map((category) => (
+              <Link
+                key={category.id}
+                href={buildHref(basePath, { ...filters, category: category.slug })}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition ${filters.category === category.slug ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+              >
+                {category.name} ({category.productCount})
+              </Link>
+            ))}
+          </div>
+        ) : null}
       </section>
 
-      {filteredProducts.length === 0 ? (
+      {products.length === 0 ? (
         <EmptyState
           title="No products found"
           description="Try adjusting your search or category filter to explore more items."
           className="rounded-[2rem]"
         >
           <div className="mt-6 flex justify-center">
-            <SecondaryButton onClick={resetFilters}>Reset filters</SecondaryButton>
+            <Link href={basePath}>
+              <SecondaryButton type="button">Reset filters</SecondaryButton>
+            </Link>
           </div>
         </EmptyState>
       ) : (
         <>
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {pagedProducts.map((product) => (
+            {products.map((product) => (
               <BaseCard key={product.id} className="flex h-full flex-col overflow-hidden p-0">
                 <div className="relative h-56 overflow-hidden">
                   <Image src={product.images[0]} alt={product.name} fill className="object-cover" />
@@ -256,18 +181,20 @@ export function ProductCatalog({ initialProducts, pagination }: ProductCatalogPr
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <Heading as="h3" size="h4">{product.name}</Heading>
-                      <Text variant="muted">{product.category}</Text>
+                      <Link href={`/products?category=${product.categorySlug}`} className="text-sm text-slate-500 transition hover:text-slate-900">
+                        {product.categoryName}
+                      </Link>
                     </div>
-                    <span className="text-lg font-semibold text-slate-900">${product.price}</span>
+                    <span className="text-lg font-semibold text-slate-900">{formatPrice(product.price)}</span>
                   </div>
                   <div className="text-sm font-medium text-slate-600">{formatStockStatus(product.stockStatus)}</div>
                   <Text variant="muted">{product.shortDescription}</Text>
                   <div className="mt-auto flex flex-wrap gap-3">
                     <Link href={`/products/${product.slug}`}>
-                      <PrimaryButton>View details</PrimaryButton>
+                      <PrimaryButton type="button">View details</PrimaryButton>
                     </Link>
-                    <a href={`https://wa.me/15550100`} target="_blank" rel="noreferrer">
-                      <SecondaryButton>WhatsApp</SecondaryButton>
+                    <a href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Hi, I'm interested in ${product.name}`)}`} target="_blank" rel="noreferrer">
+                      <SecondaryButton type="button">WhatsApp</SecondaryButton>
                     </a>
                   </div>
                 </Stack>
@@ -277,13 +204,20 @@ export function ProductCatalog({ initialProducts, pagination }: ProductCatalogPr
 
           <div className="flex flex-col gap-4 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
             <Text variant="muted">
-              Showing {(currentPage - 1) * PRODUCTS_PER_PAGE + 1}-{Math.min(currentPage * PRODUCTS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products
+              Showing {(pagination.page - 1) * pagination.limit + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} products
             </Text>
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={(page) => setCurrentPage(page)}
-            />
+            <nav aria-label="Pagination" className="flex flex-wrap items-center gap-2">
+              {Array.from({ length: pagination.totalPages }, (_, index) => index + 1).map((page) => (
+                <Link
+                  key={page}
+                  href={buildHref(basePath, { ...filters, page })}
+                  aria-current={page === pagination.page ? 'page' : undefined}
+                  className={`h-9 min-w-9 rounded-lg border px-3 py-2 text-center text-sm transition ${page === pagination.page ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                >
+                  {page}
+                </Link>
+              ))}
+            </nav>
           </div>
         </>
       )}

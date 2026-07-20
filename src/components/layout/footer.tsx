@@ -18,6 +18,7 @@ export async function Footer() {
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Quick links</p>
           {[
             { label: 'Products', href: '/products' },
+            { label: 'Categories', href: '/categories' },
             { label: 'About', href: '/about' },
             { label: 'FAQ', href: '/faq' },
             { label: 'Contact', href: '/contact' },
@@ -38,8 +39,8 @@ export async function Footer() {
           </a>
           <div className="flex gap-4">
             {businessProfile.socialLinks.map((item) => (
-              <a key={item.href} href={item.href} target="_blank" rel="noreferrer" className="text-sm text-slate-600 hover:text-slate-900">
-                {item.label}
+              <a key={item.url} href={item.url} target="_blank" rel="noreferrer" className="text-sm text-slate-600 hover:text-slate-900">
+                {item.platform}
               </a>
             ))}
           </div>

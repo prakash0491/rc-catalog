@@ -1,12 +1,17 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { BaseCard, Container, Heading, IconButton, PrimaryButton, SecondaryButton, Stack, Text, ErrorState, LoadingState } from '@/components/ui';
-import { getFeaturedProducts } from '@/lib/products-api';
+import { BaseCard, Container, Heading, IconButton, PrimaryButton, SecondaryButton, Stack, Text, ErrorState } from '@/components/ui';
+import { getPublicContent } from '@/lib/public-content';
+import { getPublicFeaturedProducts } from '@/lib/products';
 
 export async function FeaturedProductsSection() {
   try {
-    const products = await getFeaturedProducts();
+    const [products, publicContent] = await Promise.all([
+      getPublicFeaturedProducts(6),
+      getPublicContent(),
+    ]);
+    const whatsappNumber = publicContent.businessProfile.whatsapp.replace(/\D/g, '');
 
     return (
       <section>
@@ -22,7 +27,7 @@ export async function FeaturedProductsSection() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {products.slice(0, 6).map((product) => (
+            {products.map((product) => (
               <BaseCard key={product.id} className="flex h-full flex-col overflow-hidden p-0">
                 <div className="relative h-56 overflow-hidden">
                   <Image src={product.images[0]} alt={product.name} fill className="object-cover" />
@@ -42,7 +47,7 @@ export async function FeaturedProductsSection() {
                     <Link href={`/products/${product.slug}`}>
                       <PrimaryButton>View details</PrimaryButton>
                     </Link>
-                    <a href="https://wa.me/15550100" target="_blank" rel="noreferrer">
+                    <a href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Hi, I'm interested in ${product.name}`)}`} target="_blank" rel="noreferrer">
                       <IconButton icon={<span>💬</span>} label={`Contact about ${product.name}`} />
                     </a>
                   </div>

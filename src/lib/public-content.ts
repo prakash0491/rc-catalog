@@ -1,5 +1,14 @@
 import { cache } from 'react';
 
+import { prisma } from '@/lib/prisma';
+import { getActiveHeroBanner } from '@/lib/banners';
+import {
+  businessProfile as mockBusinessProfile,
+  faqs as mockFaqs,
+  faqCategories as mockFaqCategories,
+  seoConfig as mockSeoConfig,
+} from '@/mock';
+
 export interface PublicContentResponse {
   businessProfile: {
     id: string;
@@ -52,38 +61,116 @@ export interface PublicContentResponse {
   };
 }
 
-function getApiBaseUrl() {
-  if (typeof window !== 'undefined') {
-    return window.location.origin;
-  }
-
-  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL;
-
-  if (!configuredUrl) {
-    return 'http://127.0.0.1:3000';
-  }
-
-  if (configuredUrl.startsWith('http')) {
-    return configuredUrl;
-  }
-
-  return `https://${configuredUrl}`;
+function buildFallbackPublicContent(): PublicContentResponse {
+  return {
+    businessProfile: mockBusinessProfile,
+    heroBanner: null,
+    offers: [],
+    categories: [],
+    faqs: mockFaqs,
+    faqCategories: mockFaqCategories,
+    seo: {
+      title: mockBusinessProfile.name,
+      description: mockBusinessProfile.description,
+      url: mockSeoConfig.canonicalBaseUrl,
+    },
+  };
 }
 
 export const getPublicContent = cache(async (): Promise<PublicContentResponse> => {
-  const response = await fetch(`${getApiBaseUrl()}/api/public`, {
-    next: { revalidate: 60 },
-  });
+  try {
+    const [businessSettings, heroBanner, offers, categories] = await Promise.all([
+      prisma.businessSettings.findFirst({
+        orderBy: { createdAt: 'asc' },
+      }),
+      getActiveHeroBanner(),
+      prisma.offer.findMany({
+        where: { isActive: true },
+        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+        take: 4,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          image: true,
+          priority: true,
+        },
+      }),
+      prisma.category.findMany({
+        where: { isActive: true },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          image: true,
+          isActive: true,
+        },
+      }),
+    ]);
 
-  if (!response.ok) {
-    throw new Error('Unable to load public content');
+    const settings = businessSettings;
+    const businessProfile = {
+      id: settings?.id ?? 'business-profile',
+      name: settings?.businessName ?? 'Northstar Commerce',
+      tagline: 'Curated products for modern living',
+      description: settings?.seoDescription ?? 'A flexible commerce platform designed to showcase products with clarity, trust, and modern presentation.',
+      email: settings?.email ?? 'hello@northstarcommerce.com',
+      phone: settings?.phone ?? '+1-555-0100',
+      whatsapp: settings?.whatsapp ?? '+15550100',
+      address: settings?.address ?? '123 Market Street, Suite 400, New York, NY 10001',
+      openingHours: settings?.businessHours ?? 'Monâ€“Fri: 9:00 AM â€“ 6:00 PM',
+      socialLinks: [
+        { platform: 'Instagram', url: settings?.instagram ?? 'https://instagram.com' },
+        { platform: 'Facebook', url: settings?.facebook ?? 'https://facebook.com' },
+        { platform: 'YouTube', url: settings?.youtube ?? 'https://youtube.com' },
+      ],
+      mission: 'To create a calm, premium shopping experience that helps customers discover products with confidence and clarity.',
+      vision: 'To become the most trusted local destination for carefully curated products and thoughtful customer support.',
+      story: 'Northstar Commerce brings curated products, clear storytelling, and dependable service together in one refined experience.',
+      whyChooseUs: [
+        { title: 'Editorial quality', description: 'Every product page is shaped around clarity, trust, and thoughtful details.' },
+        { title: 'Thoughtful support', description: 'Customers can connect instantly through WhatsApp and email.' },
+        { title: 'Flexible presentation', description: 'The platform supports growth without rework.' },
+      ],
+      stats: [
+        { value: '24/7', label: 'Inquiry readiness' },
+        { value: '98%', label: 'Customer satisfaction' },
+        { value: '12+', label: 'Curated categories' },
+      ],
+      timeline: [
+        { year: '2021', title: 'Platform launch', description: 'The first storefront experience introduced a polished catalog and modern storytelling.' },
+        { year: '2023', title: 'Expanded content', description: 'New product pages and richer journeys were added.' },
+        { year: '2026', title: 'Premium experience', description: 'The current experience combines visual elegance and responsive support.' },
+      ],
+      aboutCta: {
+        title: 'Ready to explore the catalog?',
+        description: 'Browse products and get in touch for personalized recommendations.',
+      },
+    };
+
+    return {
+      businessProfile,
+      heroBanner,
+      offers,
+      categories: categories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        image: category.image ?? '/images/placeholder.svg',
+        shortDescription: category.description ?? 'A curated collection for modern needs.',
+        description: category.description ?? 'A curated collection for modern needs.',
+      })),
+      faqs: mockFaqs,
+      faqCategories: mockFaqCategories,
+      seo: {
+        title: settings?.seoTitle ?? businessProfile.name,
+        description: settings?.seoDescription ?? businessProfile.description,
+        url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://example.com',
+      },
+    };
+  } catch {
+    return buildFallbackPublicContent();
   }
-
-  const payload = (await response.json()) as { success?: boolean; data?: PublicContentResponse; error?: { message?: string } };
-
-  if (!payload.success || !payload.data) {
-    throw new Error(payload.error?.message || 'Unable to load public content');
-  }
-
-  return payload.data;
 });

@@ -2,8 +2,6 @@ export * from './business';
 export * from './hero';
 export * from './navigation';
 export * from './footer';
-export * from './categories';
-export * from './products';
 export * from './offers';
 export * from './seo';
 export * from './faqs';
