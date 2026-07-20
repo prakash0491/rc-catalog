@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { getAdminSessionFromCookieStore, ADMIN_LOGIN_PATH, ADMIN_HOME_PATH } from '@/lib/auth';
+import { ADMIN_HOME_PATH, ADMIN_LOGIN_PATH, getAdminSessionFromCookieStore } from '@/lib/auth/server';
 
 const navigationItems = [
   { href: ADMIN_HOME_PATH, label: 'Overview' },

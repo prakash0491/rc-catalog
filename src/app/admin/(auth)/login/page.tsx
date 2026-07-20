@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
-import { getAdminSessionFromCookieStore, getSafeAdminRedirectPath, ADMIN_HOME_PATH } from '@/lib/auth';
+import { ADMIN_HOME_PATH, getAdminSessionFromCookieStore, getSafeAdminRedirectPath } from '@/lib/auth/server';
 
 type LoginPageProps = {
   searchParams?: Promise<{

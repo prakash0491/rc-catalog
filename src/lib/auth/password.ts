@@ -1,3 +1,5 @@
+import 'server-only';
+
 import bcrypt from 'bcrypt';
 
 const BCRYPT_COST = 12;

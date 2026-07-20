@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { ADMIN_AUTH_COOKIE, ADMIN_LOGIN_PATH } from '@/lib/auth';
-import { verifyAdminSession } from '@/lib/auth';
+import { ADMIN_AUTH_COOKIE, ADMIN_LOGIN_PATH, verifyAdminSession } from '@/lib/auth/edge';
 
 const PUBLIC_ADMIN_PATHS = [ADMIN_LOGIN_PATH, '/admin/api/login', '/admin/api/logout'];
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { clearAdminSessionCookie, ADMIN_LOGIN_PATH } from '@/lib/auth';
+import { ADMIN_LOGIN_PATH, clearAdminSessionCookie } from '@/lib/auth/server';
 
 function redirectToLogin(request: NextRequest) {
   const response = NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));

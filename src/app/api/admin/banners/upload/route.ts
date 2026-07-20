@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { buildApiError, buildApiSuccess } from '@/lib/api-utils';
-import { ADMIN_AUTH_COOKIE, verifyAdminSession } from '@/lib/auth';
+import { ADMIN_AUTH_COOKIE, verifyAdminSession } from '@/lib/auth/server';
 import { uploadBannerImage } from '@/lib/cloudinary';
 
 async function requireAdminSession(request: NextRequest) {

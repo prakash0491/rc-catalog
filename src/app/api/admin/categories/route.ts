@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { buildApiError, buildApiSuccess, parsePaginationParams, parseQueryParam } from '@/lib/api-utils';
-import { ADMIN_AUTH_COOKIE, verifyAdminSession } from '@/lib/auth';
+import { ADMIN_AUTH_COOKIE, verifyAdminSession } from '@/lib/auth/server';
 import { listCategories, parseCategoryForm, resolveUniqueCategorySlug, serializeCategoryForSelect } from '@/lib/categories';
 import { prisma } from '@/lib/prisma';
 

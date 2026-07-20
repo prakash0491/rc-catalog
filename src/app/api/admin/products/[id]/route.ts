@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { buildApiError, buildApiSuccess } from '@/lib/api-utils';
-import { ADMIN_AUTH_COOKIE, verifyAdminSession } from '@/lib/auth';
+import { ADMIN_AUTH_COOKIE, verifyAdminSession } from '@/lib/auth/server';
 import {
   buildImageInputs,
   buildProductFormInput,

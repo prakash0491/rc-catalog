@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { authenticateAdmin, createAdminSessionCookie, getSafeAdminRedirectPath, ADMIN_LOGIN_PATH } from '@/lib/auth';
+import { ADMIN_LOGIN_PATH, authenticateAdmin, createAdminSessionCookie, getSafeAdminRedirectPath } from '@/lib/auth/server';
 
 const loginSchema = z.object({
   email: z.string().trim().email(),
