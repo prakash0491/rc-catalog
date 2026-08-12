@@ -4,3 +4,6 @@ export * from './product-details';
 export * from './product-gallery';
 export * from './related-products';
 export * from './breadcrumb';
+export * from './wishlist-button';
+export * from './add-to-cart-button';
+export * from './share-button';

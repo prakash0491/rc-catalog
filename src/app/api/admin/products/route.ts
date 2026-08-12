@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
+import { ProductStatus } from '@prisma/client';
 import { z } from 'zod';
 
 import { buildApiError, buildApiSuccess, parsePaginationParams, parseQueryParam } from '@/lib/api-utils';
 import { ADMIN_AUTH_COOKIE, verifyAdminSession } from '@/lib/auth/server';
 import {
-  buildImageInputs,
   buildProductFormInput,
+  bulkUpdateProducts,
+  createAdminProduct,
   getAdminProductsList,
-  resolveUniqueProductSlug,
-  serializeAdminProduct,
 } from '@/lib/admin-products';
-import { prisma } from '@/lib/prisma';
 
 async function requireAdminSession(request: NextRequest) {
   const token = request.cookies.get(ADMIN_AUTH_COOKIE)?.value;
@@ -34,9 +32,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = parseQueryParam(searchParams.get('search') ?? undefined);
     const categoryId = parseQueryParam(searchParams.get('category') ?? undefined);
+    const status = searchParams.get('status') === ProductStatus.DRAFT || searchParams.get('status') === ProductStatus.PUBLISHED ? searchParams.get('status') as ProductStatus : undefined;
     const { page, limit } = parsePaginationParams(searchParams.get('page') ?? undefined, searchParams.get('limit') ?? undefined);
 
-    const data = await getAdminProductsList({ search, categoryId, page, limit });
+    const data = await getAdminProductsList({ search, categoryId, status, page, limit });
 
     return NextResponse.json(buildApiSuccess(data));
   } catch {
@@ -54,57 +53,44 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const input = buildProductFormInput(formData);
-    const slug = await resolveUniqueProductSlug(input.slug || input.name);
-    const images = buildImageInputs(input.images);
-
-    const createdProduct = await prisma.$transaction(async (tx) => {
-      const product = await tx.product.create({
-        data: {
-          name: input.name,
-          slug,
-          shortDescription: input.shortDescription,
-          description: input.description,
-          price: new Prisma.Decimal(input.price),
-          categoryId: input.categoryId,
-          featured: input.featured,
-          newArrival: input.newArrival,
-          stockStatus: input.stockStatus,
-          isActive: input.isActive,
-        },
-      });
-
-      if (images.length > 0) {
-        await tx.productImage.createMany({
-          data: images.map((image) => ({
-            productId: product.id,
-            url: image.url,
-            alt: input.name,
-            sortOrder: image.sortOrder,
-          })),
-        });
-      }
-
-      return tx.product.findUnique({
-        where: { id: product.id },
-        include: {
-          category: true,
-          images: {
-            orderBy: { sortOrder: 'asc' },
-          },
-        },
-      });
-    });
+    const createdProduct = await createAdminProduct(input);
 
     if (!createdProduct) {
       return NextResponse.json(buildApiError('Unable to create the product.', 'INTERNAL_SERVER_ERROR'), { status: 500 });
     }
 
-    return NextResponse.json(buildApiSuccess(serializeAdminProduct(createdProduct)), { status: 201 });
+    return NextResponse.json(buildApiSuccess(createdProduct), { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(buildApiError('Invalid product data.', 'INVALID_INPUT'), { status: 400 });
     }
 
     return NextResponse.json(buildApiError('Unable to create the product.', 'INTERNAL_SERVER_ERROR'), { status: 500 });
+  }
+}
+
+const bulkActionSchema = z.object({
+  action: z.enum(['delete', 'publish', 'draft']),
+  ids: z.array(z.string().min(1)).min(1),
+});
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await requireAdminSession(request);
+
+    if (!session) {
+      return NextResponse.json(buildApiError('Unauthorized.', 'UNAUTHORIZED'), { status: 401 });
+    }
+
+    const parsed = bulkActionSchema.parse(await request.json());
+    const count = await bulkUpdateProducts(parsed.ids, parsed.action);
+
+    return NextResponse.json(buildApiSuccess({ count }));
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(buildApiError('Invalid bulk action.', 'INVALID_INPUT'), { status: 400 });
+    }
+
+    return NextResponse.json(buildApiError('Unable to update products.', 'INTERNAL_SERVER_ERROR'), { status: 500 });
   }
 }

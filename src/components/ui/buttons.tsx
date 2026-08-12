@@ -7,12 +7,12 @@ type ButtonBaseProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   fullWidth?: boolean;
 };
 
-const baseButtonClasses = 'inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50';
+const baseButtonClasses = 'inline-flex items-center justify-center rounded-full border px-5 py-2.5 text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50';
 
 export function PrimaryButton({ className, loading = false, disabled, children, ...props }: ButtonBaseProps) {
   return (
     <button
-      className={cn(baseButtonClasses, 'border-transparent bg-blue-600 text-white hover:bg-blue-700', className)}
+      className={cn(baseButtonClasses, 'border-transparent bg-slate-950 text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] hover:-translate-y-0.5 hover:bg-slate-800', className)}
       disabled={disabled || loading}
       {...props}
     >
@@ -24,7 +24,7 @@ export function PrimaryButton({ className, loading = false, disabled, children, 
 export function SecondaryButton({ className, loading = false, disabled, children, ...props }: ButtonBaseProps) {
   return (
     <button
-      className={cn(baseButtonClasses, 'border-slate-200 bg-slate-100 text-slate-900 hover:bg-slate-200', className)}
+      className={cn(baseButtonClasses, 'border-slate-200 bg-white text-slate-900 shadow-sm hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50', className)}
       disabled={disabled || loading}
       {...props}
     >
@@ -36,7 +36,7 @@ export function SecondaryButton({ className, loading = false, disabled, children
 export function OutlineButton({ className, loading = false, disabled, children, ...props }: ButtonBaseProps) {
   return (
     <button
-      className={cn(baseButtonClasses, 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50', className)}
+      className={cn(baseButtonClasses, 'border-slate-300 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-slate-900 hover:text-slate-950', className)}
       disabled={disabled || loading}
       {...props}
     >
@@ -48,7 +48,7 @@ export function OutlineButton({ className, loading = false, disabled, children, 
 export function GhostButton({ className, loading = false, disabled, children, ...props }: ButtonBaseProps) {
   return (
     <button
-      className={cn(baseButtonClasses, 'border-transparent bg-transparent text-slate-700 hover:bg-slate-100', className)}
+      className={cn(baseButtonClasses, 'border-transparent bg-transparent text-slate-700 hover:bg-slate-100 hover:text-slate-950', className)}
       disabled={disabled || loading}
       {...props}
     >
@@ -66,7 +66,7 @@ export function IconButton({ icon, label, className, ...props }: IconButtonProps
   return (
     <button
       aria-label={label}
-      className={cn('inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500', className)}
+      className={cn('inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900', className)}
       {...props}
     >
       {icon}
@@ -82,7 +82,7 @@ export function WhatsAppButton({ href, className, children = 'Contact via WhatsA
   return (
     <a
       href={href}
-      className={cn('inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2', className)}
+      className={cn('inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2', className)}
       target="_blank"
       rel="noreferrer"
       {...props}

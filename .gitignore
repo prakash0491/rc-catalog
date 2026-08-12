@@ -37,8 +37,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# source product assets (one image per product, kept locally as reference only)
+/assets
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 /src/generated/prisma
+.freebuff/

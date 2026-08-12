@@ -9,6 +9,8 @@ const navigationItems = [
   { href: '/admin/categories', label: 'Categories' },
   { href: '/admin/banner', label: 'Banner' },
   { href: '/admin/offers', label: 'Offers' },
+  { href: '/admin/inquiries', label: 'Inquiries' },
+  { href: '/admin/settings', label: 'Settings' },
 ];
 
 export default async function AdminProtectedLayout({ children }: Readonly<{ children: React.ReactNode }>) {

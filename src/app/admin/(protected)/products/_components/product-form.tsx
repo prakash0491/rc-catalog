@@ -20,12 +20,31 @@ type ProductFormValues = {
   shortDescription: string;
   description: string;
   price: string;
+  mrp: string;
+  discountPercent: string;
+  sku: string;
+  stockQuantity: string;
+  lowStockThreshold: string;
   categoryId: string;
   featured: boolean;
   newArrival: boolean;
+  bestSeller: boolean;
+  status: 'DRAFT' | 'PUBLISHED';
   isActive: boolean;
   stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
+  metaTitle: string;
+  metaDescription: string;
   images: string[];
+  thumbnailImage: string;
+  specifications: Array<{ name: string; value: string }>;
+  variants: Array<{
+    optionName: string;
+    optionValue: string;
+    sku: string;
+    priceOverride: string;
+    stockQuantity: string;
+    isActive: boolean;
+  }>;
 };
 
 type ProductFormProps = {
@@ -53,13 +72,22 @@ export function ProductForm({ actionUrl, method, submitLabel, successRedirect, c
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [images, setImages] = useState<string[]>(initialValues.images);
+  const [thumbnailImage, setThumbnailImage] = useState(initialValues.thumbnailImage || initialValues.images[0] || '');
+  const [specifications, setSpecifications] = useState(initialValues.specifications.length > 0 ? initialValues.specifications : [{ name: '', value: '' }]);
+  const [variants, setVariants] = useState(initialValues.variants.length > 0 ? initialValues.variants : [{ optionName: '', optionValue: '', sku: '', priceOverride: '', stockQuantity: '0', isActive: true }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const removeImage = (index: number) => {
-    setImages((current) => current.filter((_, currentIndex) => currentIndex !== index));
+    setImages((current) => {
+      const nextImages = current.filter((_, currentIndex) => currentIndex !== index);
+      if (thumbnailImage === current[index]) {
+        setThumbnailImage(nextImages[0] ?? '');
+      }
+      return nextImages;
+    });
   };
 
   const moveImage = (index: number, direction: -1 | 1) => {
@@ -103,6 +131,9 @@ export function ProductForm({ actionUrl, method, submitLabel, successRedirect, c
         }
 
         setImages((current) => [...current, payload.data!.url!]);
+        if (!thumbnailImage) {
+          setThumbnailImage(payload.data.url);
+        }
         setUploadProgress(100);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Unable to upload the product image.');
@@ -134,6 +165,27 @@ export function ProductForm({ actionUrl, method, submitLabel, successRedirect, c
       const formData = new FormData(event.currentTarget);
       formData.delete('images');
       images.forEach((image) => formData.append('images', image));
+      formData.set('thumbnailImage', thumbnailImage);
+      formData.delete('specificationNames');
+      formData.delete('specificationValues');
+      specifications.forEach((specification) => {
+        formData.append('specificationNames', specification.name);
+        formData.append('specificationValues', specification.value);
+      });
+      formData.delete('variantOptionNames');
+      formData.delete('variantOptionValues');
+      formData.delete('variantSkus');
+      formData.delete('variantPriceOverrides');
+      formData.delete('variantStockQuantities');
+      formData.delete('variantActiveStates');
+      variants.forEach((variant) => {
+        formData.append('variantOptionNames', variant.optionName);
+        formData.append('variantOptionValues', variant.optionValue);
+        formData.append('variantSkus', variant.sku);
+        formData.append('variantPriceOverrides', variant.priceOverride);
+        formData.append('variantStockQuantities', variant.stockQuantity);
+        formData.append('variantActiveStates', String(variant.isActive));
+      });
 
       const response = await fetch(actionUrl, {
         method,
@@ -200,6 +252,31 @@ export function ProductForm({ actionUrl, method, submitLabel, successRedirect, c
         </label>
 
         <label className="space-y-2">
+          <span className="text-sm font-medium text-slate-700">MRP</span>
+          <Input name="mrp" type="number" step="0.01" min="0" defaultValue={initialValues.mrp} />
+        </label>
+
+        <label className="space-y-2">
+          <span className="text-sm font-medium text-slate-700">Discount (%)</span>
+          <Input name="discountPercent" type="number" step="1" min="0" max="100" defaultValue={initialValues.discountPercent} />
+        </label>
+
+        <label className="space-y-2">
+          <span className="text-sm font-medium text-slate-700">SKU</span>
+          <Input name="sku" defaultValue={initialValues.sku} />
+        </label>
+
+        <label className="space-y-2">
+          <span className="text-sm font-medium text-slate-700">Stock quantity</span>
+          <Input name="stockQuantity" type="number" step="1" min="0" defaultValue={initialValues.stockQuantity} />
+        </label>
+
+        <label className="space-y-2">
+          <span className="text-sm font-medium text-slate-700">Low stock warning</span>
+          <Input name="lowStockThreshold" type="number" step="1" min="0" defaultValue={initialValues.lowStockThreshold} />
+        </label>
+
+        <label className="space-y-2">
           <span className="text-sm font-medium text-slate-700">Stock status</span>
           <Select name="stockStatus" defaultValue={initialValues.stockStatus} required>
             {stockStatusOptions.map((option) => (
@@ -209,9 +286,27 @@ export function ProductForm({ actionUrl, method, submitLabel, successRedirect, c
             ))}
           </Select>
         </label>
+
+        <label className="space-y-2">
+          <span className="text-sm font-medium text-slate-700">Publication</span>
+          <Select name="status" defaultValue={initialValues.status} required>
+            <option value="DRAFT">Draft</option>
+            <option value="PUBLISHED">Published</option>
+          </Select>
+        </label>
+
+        <label className="space-y-2">
+          <span className="text-sm font-medium text-slate-700">Meta title</span>
+          <Input name="metaTitle" defaultValue={initialValues.metaTitle} maxLength={160} />
+        </label>
+
+        <label className="space-y-2 md:col-span-2">
+          <span className="text-sm font-medium text-slate-700">Meta description</span>
+          <Textarea name="metaDescription" defaultValue={initialValues.metaDescription} />
+        </label>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
         <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
           <Checkbox name="featured" defaultChecked={initialValues.featured} />
           <span className="text-sm font-medium text-slate-700">Featured</span>
@@ -220,6 +315,11 @@ export function ProductForm({ actionUrl, method, submitLabel, successRedirect, c
         <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
           <Checkbox name="newArrival" defaultChecked={initialValues.newArrival} />
           <span className="text-sm font-medium text-slate-700">New arrival</span>
+        </label>
+
+        <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <Checkbox name="bestSeller" defaultChecked={initialValues.bestSeller} />
+          <span className="text-sm font-medium text-slate-700">Best seller</span>
         </label>
 
         <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -274,6 +374,15 @@ export function ProductForm({ actionUrl, method, submitLabel, successRedirect, c
                 <div className="space-y-3 p-4">
                   <p className="break-all text-xs text-slate-500">{image}</p>
                   <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                      <input
+                        type="radio"
+                        name="thumbnailSelector"
+                        checked={thumbnailImage === image}
+                        onChange={() => setThumbnailImage(image)}
+                      />
+                      Thumbnail
+                    </label>
                     <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
                       <GripVertical className="h-3 w-3" aria-hidden="true" />
                       #{index + 1}
@@ -313,6 +422,79 @@ export function ProductForm({ actionUrl, method, submitLabel, successRedirect, c
           </div>
         )}
       </div>
+
+      <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Specifications</h2>
+            <p className="text-sm text-slate-500">Add dynamic product attributes without changing code.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSpecifications((current) => [...current, { name: '', value: '' }])}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            Add spec
+          </button>
+        </div>
+        <div className="space-y-3">
+          {specifications.map((specification, index) => (
+            <div key={index} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+              <Input
+                value={specification.name}
+                placeholder="Name, e.g. Material"
+                onChange={(event) => setSpecifications((current) => current.map((item, currentIndex) => currentIndex === index ? { ...item, name: event.target.value } : item))}
+              />
+              <Input
+                value={specification.value}
+                placeholder="Value, e.g. Aluminum"
+                onChange={(event) => setSpecifications((current) => current.map((item, currentIndex) => currentIndex === index ? { ...item, value: event.target.value } : item))}
+              />
+              <button
+                type="button"
+                onClick={() => setSpecifications((current) => current.filter((_, currentIndex) => currentIndex !== index))}
+                className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Variants</h2>
+            <p className="text-sm text-slate-500">Prepare options such as color, size, battery, or model.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setVariants((current) => [...current, { optionName: '', optionValue: '', sku: '', priceOverride: '', stockQuantity: '0', isActive: true }])}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            Add variant
+          </button>
+        </div>
+        <div className="space-y-3">
+          {variants.map((variant, index) => (
+            <div key={index} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-6">
+              <Input value={variant.optionName} placeholder="Option, e.g. Color" onChange={(event) => setVariants((current) => current.map((item, currentIndex) => currentIndex === index ? { ...item, optionName: event.target.value } : item))} />
+              <Input value={variant.optionValue} placeholder="Value, e.g. Black" onChange={(event) => setVariants((current) => current.map((item, currentIndex) => currentIndex === index ? { ...item, optionValue: event.target.value } : item))} />
+              <Input value={variant.sku} placeholder="Variant SKU" onChange={(event) => setVariants((current) => current.map((item, currentIndex) => currentIndex === index ? { ...item, sku: event.target.value } : item))} />
+              <Input value={variant.priceOverride} type="number" step="0.01" min="0" placeholder="Price override" onChange={(event) => setVariants((current) => current.map((item, currentIndex) => currentIndex === index ? { ...item, priceOverride: event.target.value } : item))} />
+              <Input value={variant.stockQuantity} type="number" step="1" min="0" placeholder="Stock" onChange={(event) => setVariants((current) => current.map((item, currentIndex) => currentIndex === index ? { ...item, stockQuantity: event.target.value } : item))} />
+              <button
+                type="button"
+                onClick={() => setVariants((current) => current.filter((_, currentIndex) => currentIndex !== index))}
+                className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="flex flex-wrap items-center gap-3">
         <button

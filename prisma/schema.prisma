@@ -30,23 +30,41 @@ model Product {
   shortDescription String
   description      String
   price            Decimal        @db.Decimal(10, 2)
+  mrp              Decimal?       @db.Decimal(10, 2)
+  discountPercent  Int            @default(0)
+  sku              String?        @db.VarChar(80)
+  stockQuantity    Int            @default(0)
+  lowStockThreshold Int           @default(5)
   categoryId       String
   featured         Boolean        @default(false)
   newArrival       Boolean        @default(false)
+  bestSeller       Boolean        @default(false)
+  status           ProductStatus  @default(DRAFT)
   stockStatus      StockStatus    @default(IN_STOCK)
   isActive         Boolean        @default(true)
+  metaTitle        String?        @db.VarChar(160)
+  metaDescription  String?
+  deletedAt        DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   inquiries        Inquiry[]
+  wishlistItems    WishlistItem[]
+  cartItems        CartItem[]
   category         Category       @relation(fields: [categoryId], references: [id])
   images           ProductImage[]
+  specifications   ProductSpecification[]
+  variants         ProductVariant[]
 
   @@index([categoryId])
   @@index([isActive])
+  @@index([status])
+  @@index([deletedAt])
   @@index([featured])
   @@index([newArrival])
+  @@index([bestSeller])
   @@index([stockStatus])
   @@index([slug])
+  @@index([sku])
 }
 
 model ProductImage {
@@ -55,11 +73,45 @@ model ProductImage {
   url       String
   alt       String?  @db.VarChar(180)
   sortOrder Int      @default(0)
+  isThumbnail Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, sortOrder])
+  @@index([productId, isThumbnail])
+}
+
+model ProductSpecification {
+  id        String   @id @default(cuid())
+  productId String
+  name      String   @db.VarChar(120)
+  value     String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+model ProductVariant {
+  id            String   @id @default(cuid())
+  productId     String
+  optionName    String   @db.VarChar(80)
+  optionValue   String   @db.VarChar(120)
+  sku           String?  @db.VarChar(80)
+  priceOverride Decimal? @db.Decimal(10, 2)
+  stockQuantity Int      @default(0)
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  cartItems     CartItem[]
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@index([optionName, optionValue])
 }
 
 model Banner {
@@ -136,14 +188,161 @@ model Admin {
   updatedAt    DateTime @updatedAt
 }
 
+model Customer {
+  id           String   @id @default(cuid())
+  name         String   @db.VarChar(120)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  cart          Cart?
+  wishlistItems WishlistItem[]
+  orders        Order[]
+
+  @@index([email])
+}
+
+model WishlistItem {
+  id         String   @id @default(cuid())
+  customerId String
+  productId  String
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@unique([customerId, productId])
+  @@index([customerId])
+  @@index([productId])
+}
+
+model Cart {
+  id             String   @id @default(cuid())
+  customerId     String?  @unique
+  guestSessionId String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  customer Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items    CartItem[]
+
+  @@index([customerId])
+  @@index([guestSessionId])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  productId String
+  variantId String?
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id])
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@unique([cartId, productId, variantId])
+  @@index([cartId])
+  @@index([productId])
+}
+
 enum StockStatus {
   IN_STOCK
   LOW_STOCK
   OUT_OF_STOCK
 }
 
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+}
+
 enum InquiryStatus {
   NEW
   CONTACTED
   CLOSED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PAYMENT_FAILED
+  CANCELLED
+  // Extensible lifecycle for future fulfillment phases.
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique @db.VarChar(40)
+  customerId  String
+  status      OrderStatus @default(PENDING_PAYMENT)
+  subtotal    Decimal     @db.Decimal(10, 2)
+  total       Decimal     @db.Decimal(10, 2)
+  currency    String      @default("INR") @db.VarChar(8)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  customer Customer  @relation(fields: [customerId], references: [id])
+  items    OrderItem[]
+  payments Payment[]
+
+  @@index([customerId, createdAt])
+  @@index([status])
+}
+
+// Order items hold immutable commercial snapshots so historical orders remain
+// accurate even if the Product record changes later.
+model OrderItem {
+  id                 String   @id @default(cuid())
+  orderId            String
+  productId          String
+  variantId          String?
+  productName        String   @db.VarChar(200)
+  productSlug        String?  @db.VarChar(220)
+  sku                String?  @db.VarChar(80)
+  variantOptionName  String?  @db.VarChar(80)
+  variantOptionValue String?  @db.VarChar(120)
+  imageUrl           String?
+  price              Decimal  @db.Decimal(10, 2)
+  quantity           Int
+  lineTotal          Decimal  @db.Decimal(10, 2)
+  createdAt          DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String
+  provider          String        @default("razorpay") @db.VarChar(40)
+  providerOrderId   String        @unique @db.VarChar(80)
+  providerPaymentId String?       @db.VarChar(80)
+  razorpaySignature String?
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("INR") @db.VarChar(8)
+  status            PaymentStatus @default(PENDING)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
 }

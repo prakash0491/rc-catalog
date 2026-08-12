@@ -3,8 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f8fb;
+  --foreground: #061226;
+  --surface: #ffffff;
+  --muted: #64748b;
+  --line: #e5e7eb;
 }
 
 html,
@@ -14,8 +17,44 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
 }
 
 * {
   box-sizing: border-box;
+}
+
+::selection {
+  background: #061226;
+  color: #ffffff;
+}
+
+a {
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+}
+
+.premium-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.premium-scrollbar::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.premium-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.storefront-shell {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 42%, #f4f5f8 100%);
 }

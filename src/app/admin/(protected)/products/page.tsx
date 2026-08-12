@@ -1,15 +1,19 @@
 import Link from 'next/link';
+import { ProductStatus } from '@prisma/client';
 
 import { Badge, Container, Heading, OutlineButton, PrimaryButton, SearchInput, Select, Text } from '@/components/ui';
 import { prisma } from '@/lib/prisma';
 import { parsePaginationParams, parseQueryParam } from '@/lib/api-utils';
 import { getAdminProductsList } from '@/lib/admin-products';
+import { BulkProductActions } from './_components/bulk-product-actions';
 import { DeleteProductButton } from './_components/delete-product-button';
+import { DuplicateProductButton } from './_components/duplicate-product-button';
 
 type ProductsPageProps = {
   searchParams?: Promise<{
     search?: string;
     category?: string;
+    status?: string;
     page?: string;
     limit?: string;
   }>;
@@ -30,6 +34,7 @@ export default async function AdminProductsPage({ searchParams }: ProductsPagePr
   const params = await searchParams;
   const search = parseQueryParam(params?.search);
   const categoryId = parseQueryParam(params?.category);
+  const status = params?.status === ProductStatus.DRAFT || params?.status === ProductStatus.PUBLISHED ? params.status : undefined;
   const { page, limit } = parsePaginationParams(params?.page, params?.limit);
 
   const [categories, productsData] = await Promise.all([
@@ -37,12 +42,13 @@ export default async function AdminProductsPage({ searchParams }: ProductsPagePr
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
     }),
-    getAdminProductsList({ search, categoryId, page, limit }),
+    getAdminProductsList({ search, categoryId, status, page, limit }),
   ]);
 
   const filterParams = new URLSearchParams();
   if (search) filterParams.set('search', search);
   if (categoryId) filterParams.set('category', categoryId);
+  if (status) filterParams.set('status', status);
   if (limit !== 10) filterParams.set('limit', String(limit));
 
   return (
@@ -59,7 +65,7 @@ export default async function AdminProductsPage({ searchParams }: ProductsPagePr
         </Link>
       </div>
 
-      <form className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_240px_auto]" method="get">
+      <form className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_220px_180px_auto]" method="get">
         <SearchInput name="search" defaultValue={search ?? ''} placeholder="Search products" />
         <Select name="category" defaultValue={categoryId ?? ''}>
           <option value="">All categories</option>
@@ -68,6 +74,11 @@ export default async function AdminProductsPage({ searchParams }: ProductsPagePr
               {category.name}
             </option>
           ))}
+        </Select>
+        <Select name="status" defaultValue={status ?? ''}>
+          <option value="">All statuses</option>
+          <option value="DRAFT">Draft</option>
+          <option value="PUBLISHED">Published</option>
         </Select>
         <div className="flex gap-3">
           <input type="hidden" name="limit" value={String(limit)} />
@@ -78,6 +89,8 @@ export default async function AdminProductsPage({ searchParams }: ProductsPagePr
         </div>
       </form>
 
+      <BulkProductActions products={productsData.items.map((product) => ({ id: product.id, name: product.name }))} />
+
       <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-left">
@@ -85,7 +98,8 @@ export default async function AdminProductsPage({ searchParams }: ProductsPagePr
               <tr>
                 <th className="px-5 py-4 font-semibold">Product</th>
                 <th className="px-5 py-4 font-semibold">Category</th>
-                <th className="px-5 py-4 font-semibold">Price</th>
+                <th className="px-5 py-4 font-semibold">Pricing</th>
+                <th className="px-5 py-4 font-semibold">Inventory</th>
                 <th className="px-5 py-4 font-semibold">Flags</th>
                 <th className="px-5 py-4 font-semibold">Status</th>
                 <th className="px-5 py-4 font-semibold">Actions</th>
@@ -99,25 +113,39 @@ export default async function AdminProductsPage({ searchParams }: ProductsPagePr
                       <div className="space-y-1">
                         <div className="font-semibold text-slate-900">{product.name}</div>
                         <div className="max-w-xl text-sm leading-6 text-slate-500">{product.shortDescription}</div>
-                        <div className="text-xs text-slate-400">{product.slug}</div>
+                        <div className="text-xs text-slate-400">{product.sku ?? product.slug}</div>
                       </div>
                     </td>
                     <td className="px-5 py-4 text-sm text-slate-700">{product.category.name}</td>
-                    <td className="px-5 py-4 text-sm font-semibold text-slate-900">${product.price.toFixed(2)}</td>
+                    <td className="px-5 py-4 text-sm text-slate-700">
+                      <div className="font-semibold text-slate-900">${product.price.toFixed(2)}</div>
+                      {product.mrp ? <div className="text-xs text-slate-500">MRP ${product.mrp.toFixed(2)}</div> : null}
+                      {product.discountPercent > 0 ? <Badge tone="info">{product.discountPercent}% off</Badge> : null}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-slate-700">
+                      <div className="font-semibold text-slate-900">{product.stockQuantity}</div>
+                      <div className="text-xs text-slate-500">Low at {product.lowStockThreshold}</div>
+                      <Badge tone={product.stockStatus === 'OUT_OF_STOCK' ? 'error' : product.stockStatus === 'LOW_STOCK' ? 'warning' : 'success'}>{product.stockStatus.replaceAll('_', ' ')}</Badge>
+                    </td>
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-2">
                         {product.featured ? <Badge tone="info">Featured</Badge> : null}
                         {product.newArrival ? <Badge tone="default">New</Badge> : null}
+                        {product.bestSeller ? <Badge tone="success">Best seller</Badge> : null}
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <Badge tone={product.isActive ? 'success' : 'error'}>{product.isActive ? 'Active' : 'Inactive'}</Badge>
+                      <div className="flex flex-col gap-2">
+                        <Badge tone={product.status === 'PUBLISHED' ? 'success' : 'warning'}>{product.status}</Badge>
+                        <Badge tone={product.isActive ? 'success' : 'error'}>{product.isActive ? 'Active' : 'Inactive'}</Badge>
+                      </div>
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-2">
                         <Link href={`/admin/products/${product.id}`}>
                           <OutlineButton>Edit</OutlineButton>
                         </Link>
+                        <DuplicateProductButton productId={product.id} />
                         <DeleteProductButton productId={product.id} productName={product.name} />
                       </div>
                     </td>
@@ -125,7 +153,7 @@ export default async function AdminProductsPage({ searchParams }: ProductsPagePr
                 ))
               ) : (
                 <tr>
-                  <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={6}>
+                  <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={7}>
                     No products found for the selected filters.
                   </td>
                 </tr>

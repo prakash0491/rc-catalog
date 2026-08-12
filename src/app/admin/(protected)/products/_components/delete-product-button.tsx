@@ -13,7 +13,7 @@ export function DeleteProductButton({ productId, productName }: DeleteProductBut
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
-    const isConfirmed = window.confirm(`Delete ${productName}? This action cannot be undone.`);
+    const isConfirmed = window.confirm(`Archive ${productName}? It will be removed from the public catalog.`);
 
     if (!isConfirmed) {
       return;
@@ -27,7 +27,7 @@ export function DeleteProductButton({ productId, productName }: DeleteProductBut
       });
 
       if (!response.ok) {
-        throw new Error('Unable to delete the product.');
+        throw new Error('Unable to archive the product.');
       }
 
       router.refresh();
@@ -43,7 +43,7 @@ export function DeleteProductButton({ productId, productName }: DeleteProductBut
       disabled={isDeleting}
       className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {isDeleting ? 'Deleting...' : 'Delete'}
+      {isDeleting ? 'Archiving...' : 'Archive'}
     </button>
   );
 }

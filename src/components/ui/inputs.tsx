@@ -37,7 +37,7 @@ export function SearchInput({ className, ...props }: InputBaseProps) {
     <div className="relative">
       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
       <input
-        className={cn('w-full rounded-full border border-slate-300 bg-white pl-10 pr-4 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20', className)}
+        className={cn('w-full rounded-full border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10', className)}
         type="search"
         {...props}
       />

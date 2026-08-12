@@ -6,8 +6,10 @@ import {
   ProductDetails,
   RelatedProducts,
 } from '@/components/product';
+import { getCustomerSession } from '@/lib/auth/customer-session';
 import { getPublicContent } from '@/lib/public-content';
 import { getPublicProductPageData } from '@/lib/products';
+import { isProductWishlisted } from '@/lib/wishlist';
 
 type ProductDetailsPageProps = {
   params: Promise<{ slug: string }>;
@@ -27,11 +29,18 @@ export default async function ProductDetailsPage({ params }: ProductDetailsPageP
     notFound();
   }
 
+  const customer = await getCustomerSession();
+  const wishlisted = customer ? await isProductWishlisted(customer.id, data.product.id) : false;
+
   return (
     <SectionContainer spacing="sm">
       <ResponsiveContainer className="space-y-10">
         <ProductBreadcrumb productName={data.product.name} />
-        <ProductDetails product={data.product} whatsappNumber={publicContent.businessProfile.whatsapp.replace(/\D/g, '')} />
+        <ProductDetails
+          product={data.product}
+          whatsappNumber={publicContent.businessProfile.whatsapp.replace(/\D/g, '')}
+          initiallyWishlisted={wishlisted}
+        />
         <RelatedProducts products={data.relatedProducts} />
       </ResponsiveContainer>
     </SectionContainer>

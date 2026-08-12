@@ -19,6 +19,12 @@ export default async function AdminEditProductPage({ params }: ProductEditPagePr
         images: {
           orderBy: { sortOrder: 'asc' },
         },
+        specifications: {
+          orderBy: { sortOrder: 'asc' },
+        },
+        variants: {
+          orderBy: { sortOrder: 'asc' },
+        },
       },
     }),
     prisma.category.findMany({
@@ -35,7 +41,7 @@ export default async function AdminEditProductPage({ params }: ProductEditPagePr
     <Container className="space-y-6 px-0">
       <div className="space-y-2">
         <Heading as="h1" size="h2">Edit product</Heading>
-        <Text variant="muted">Update the product details and replace associated image URLs as needed.</Text>
+        <Text variant="muted">Update product content, inventory, pricing, SEO, variants, and Cloudinary images.</Text>
       </div>
 
       <ProductForm
@@ -50,12 +56,34 @@ export default async function AdminEditProductPage({ params }: ProductEditPagePr
           shortDescription: product.shortDescription,
           description: product.description,
           price: product.price.toString(),
+          mrp: product.mrp?.toString() ?? '',
+          discountPercent: String(product.discountPercent),
+          sku: product.sku ?? '',
+          stockQuantity: String(product.stockQuantity),
+          lowStockThreshold: String(product.lowStockThreshold),
           categoryId: product.categoryId,
           featured: product.featured,
           newArrival: product.newArrival,
+          bestSeller: product.bestSeller,
+          status: product.status,
           isActive: product.isActive,
           stockStatus: product.stockStatus,
+          metaTitle: product.metaTitle ?? '',
+          metaDescription: product.metaDescription ?? '',
           images: product.images.map((image) => image.url),
+          thumbnailImage: product.images.find((image) => image.isThumbnail)?.url ?? product.images[0]?.url ?? '',
+          specifications: product.specifications.map((specification) => ({
+            name: specification.name,
+            value: specification.value,
+          })),
+          variants: product.variants.map((variant) => ({
+            optionName: variant.optionName,
+            optionValue: variant.optionValue,
+            sku: variant.sku ?? '',
+            priceOverride: variant.priceOverride?.toString() ?? '',
+            stockQuantity: String(variant.stockQuantity),
+            isActive: variant.isActive,
+          })),
         }}
       />
     </Container>

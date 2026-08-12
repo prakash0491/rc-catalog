@@ -118,7 +118,7 @@ export const getPublicContent = cache(async (): Promise<PublicContentResponse> =
       description: settings?.seoDescription ?? 'A flexible commerce platform designed to showcase products with clarity, trust, and modern presentation.',
       email: settings?.email ?? 'hello@northstarcommerce.com',
       phone: settings?.phone ?? '+1-555-0100',
-      whatsapp: settings?.whatsapp ?? '+15550100',
+      whatsapp: settings?.whatsapp ?? '+91',
       address: settings?.address ?? '123 Market Street, Suite 400, New York, NY 10001',
       openingHours: settings?.businessHours ?? 'Monâ€“Fri: 9:00 AM â€“ 6:00 PM',
       socialLinks: [
