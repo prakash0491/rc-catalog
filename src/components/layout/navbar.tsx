@@ -12,7 +12,7 @@ import { getWishlistCount } from '@/lib/wishlist';
 
 const navItems = [
   { label: 'Shop', href: '/products' },
-  { label: 'RC Cars', href: '/categories' },
+  { label: 'RC Cars', href: '/categories/rc-cars' },
   { label: 'Categories', href: '/categories' },
   { label: 'About', href: '/about' },
   { label: 'Contact', href: '/contact' },

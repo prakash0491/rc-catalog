@@ -1,19 +1,11 @@
 import 'server-only';
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-import { CUSTOMER_AUTH_COOKIE } from '@/lib/auth/customer-constants';
+import { clearCustomerSessionCookie } from '@/lib/auth/customer-session';
 
-export async function POST() {
-  const response = NextResponse.json({ success: true });
+export async function POST(request: NextRequest) {
+  const response = NextResponse.redirect(new URL('/', request.url), 303);
 
-  response.cookies.set(CUSTOMER_AUTH_COOKIE, '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    path: '/',
-    maxAge: 0,
-  });
-
-  return response;
+  return clearCustomerSessionCookie(response);
 }

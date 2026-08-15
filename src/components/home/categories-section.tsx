@@ -1,6 +1,6 @@
-import Image from 'next/image';
 import Link from 'next/link';
 
+import { ImageWithFallback } from '@/components/common/image-with-fallback';
 import { Container, Heading, Text } from '@/components/ui';
 import { getPublicContent } from '@/lib/public-content';
 
@@ -36,7 +36,7 @@ export async function CategoriesSection() {
               className="group flex min-w-[140px] snap-start flex-col items-center text-center"
             >
               <span className="relative grid h-28 w-28 place-items-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.07)] transition duration-300 group-hover:-translate-y-1 group-hover:border-slate-950 group-hover:shadow-[0_22px_55px_rgba(15,23,42,0.12)] sm:h-32 sm:w-32">
-                <Image
+                <ImageWithFallback
                   src={category.image}
                   alt={category.name}
                   fill

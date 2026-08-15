@@ -5,6 +5,11 @@ export function buildApiSuccess<T>(data: T) {
   };
 }
 
+export function formatZodErrorMessage(error: { issues: Array<{ message: string }> }) {
+  const firstIssue = error.issues[0];
+  return firstIssue?.message || 'Invalid input.';
+}
+
 export function buildApiError(message: string, code: string) {
   return {
     success: false,

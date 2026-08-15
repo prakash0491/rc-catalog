@@ -98,7 +98,7 @@ export const getPublicContent = cache(async (): Promise<PublicContentResponse> =
       }),
       prisma.category.findMany({
         where: { isActive: true },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
         select: {
           id: true,
           name: true,

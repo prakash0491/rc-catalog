@@ -6,13 +6,14 @@ import { useState } from 'react';
 type DeleteCategoryButtonProps = {
   categoryId: string;
   categoryName: string;
-  productCount: number;
+  /** Total products attached to the category (including drafts/soft-deleted). */
+  totalProductCount: number;
 };
 
-export function DeleteCategoryButton({ categoryId, categoryName, productCount }: DeleteCategoryButtonProps) {
+export function DeleteCategoryButton({ categoryId, categoryName, totalProductCount }: DeleteCategoryButtonProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
-  const disabled = productCount > 0;
+  const disabled = totalProductCount > 0;
 
   const handleDelete = async () => {
     if (disabled) {

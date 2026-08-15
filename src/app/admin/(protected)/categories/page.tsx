@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { ImageWithFallback } from '@/components/common/image-with-fallback';
 import { Badge, Container, Heading, OutlineButton, PrimaryButton, SearchInput, Text } from '@/components/ui';
 import { parsePaginationParams, parseQueryParam } from '@/lib/api-utils';
 import { listCategories } from '@/lib/categories';
@@ -75,8 +76,9 @@ export default async function AdminCategoriesPage({ searchParams }: CategoriesPa
           <table className="min-w-full divide-y divide-slate-200 text-left">
             <thead className="bg-slate-50 text-xs uppercase tracking-[0.18em] text-slate-500">
               <tr>
+                <th className="px-5 py-4 font-semibold">Image</th>
                 <th className="px-5 py-4 font-semibold">Category</th>
-                <th className="px-5 py-4 font-semibold">Products</th>
+                <th className="px-5 py-4 font-semibold">Live products</th>
                 <th className="px-5 py-4 font-semibold">Order</th>
                 <th className="px-5 py-4 font-semibold">Status</th>
                 <th className="px-5 py-4 font-semibold">Actions</th>
@@ -86,6 +88,17 @@ export default async function AdminCategoriesPage({ searchParams }: CategoriesPa
               {categoriesData.items.length > 0 ? (
                 categoriesData.items.map((category) => (
                   <tr key={category.id} className="align-top">
+                    <td className="px-5 py-4">
+                      <div className="relative h-14 w-14 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                        <ImageWithFallback
+                          src={category.image}
+                          alt={category.name}
+                          fill
+                          sizes="56px"
+                          className={category.image ? 'object-cover' : 'object-contain p-2'}
+                        />
+                      </div>
+                    </td>
                     <td className="px-5 py-4">
                       <div className="space-y-1">
                         <div className="font-semibold text-slate-900">{category.name}</div>
@@ -103,14 +116,14 @@ export default async function AdminCategoriesPage({ searchParams }: CategoriesPa
                         <Link href={`/admin/categories/${category.id}`}>
                           <OutlineButton>Edit</OutlineButton>
                         </Link>
-                        <DeleteCategoryButton categoryId={category.id} categoryName={category.name} productCount={category.productCount} />
+                        <DeleteCategoryButton categoryId={category.id} categoryName={category.name} totalProductCount={category.totalProductCount} />
                       </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={5}>
+                  <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={6}>
                     No categories found for the selected filters.
                   </td>
                 </tr>

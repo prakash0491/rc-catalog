@@ -76,3 +76,7 @@ export async function uploadBannerImage(file: File) {
 export async function uploadProductImage(file: File, publicId?: string) {
   return uploadImage(file, 'rc-catalog/products', publicId);
 }
+
+export async function uploadCategoryImage(file: File) {
+  return uploadImage(file, 'rc-catalog/categories');
+}

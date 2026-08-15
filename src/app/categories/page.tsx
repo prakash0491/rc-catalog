@@ -1,6 +1,6 @@
-import Image from 'next/image';
 import Link from 'next/link';
 
+import { ImageWithFallback } from '@/components/common/image-with-fallback';
 import { ResponsiveContainer, SectionContainer } from '@/components/common';
 import { BaseCard, Breadcrumb, Heading, Text } from '@/components/ui';
 import { listPublicProductCategories } from '@/lib/products';
@@ -28,12 +28,7 @@ export default async function CategoriesPage() {
             <Link key={category.id} href={`/categories/${category.slug}`} className="group block">
               <BaseCard className="h-full overflow-hidden p-0">
                 <div className="relative h-56 bg-slate-100">
-                  <Image
-                    src={category.image ?? '/images/placeholder.svg'}
-                    alt={category.name}
-                    fill
-                    className="object-cover transition duration-300 group-hover:scale-105"
-                  />
+                  <ImageWithFallback src={category.image} alt={category.name} fill className="object-cover transition duration-300 group-hover:scale-105" />
                 </div>
                 <div className="space-y-3 p-6">
                   <Heading as="h2" size="h4">{category.name}</Heading>
