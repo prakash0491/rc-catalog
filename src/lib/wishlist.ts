@@ -16,9 +16,13 @@ const WISHLIST_PRODUCT_SELECT = {
   category: { select: { name: true, slug: true } },
 } as const;
 
+const VISIBLE_PRODUCT_FILTER = { isActive: true, status: 'PUBLISHED' as const, deletedAt: null };
+
 export async function getWishlistForCustomer(customerId: string) {
   return prisma.wishlistItem.findMany({
-    where: { customerId },
+    // Items whose product was archived or unpublished stay in storage but are
+    // hidden until the product is publishable again.
+    where: { customerId, product: VISIBLE_PRODUCT_FILTER },
     orderBy: { createdAt: 'desc' },
     include: {
       product: {
@@ -83,5 +87,5 @@ export async function toggleWishlistItem(customerId: string, productId: string) 
 }
 
 export async function getWishlistCount(customerId: string) {
-  return prisma.wishlistItem.count({ where: { customerId } });
+  return prisma.wishlistItem.count({ where: { customerId, product: VISIBLE_PRODUCT_FILTER } });
 }

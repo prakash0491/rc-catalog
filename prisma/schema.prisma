@@ -276,6 +276,8 @@ enum OrderStatus {
   SHIPPED
   DELIVERED
   REFUNDED
+  // Payment was captured but inventory could not be reserved.
+  REFUND_REQUIRED
 }
 
 enum PaymentStatus {

@@ -8,7 +8,8 @@ export type OrderStatusValue =
   | 'PROCESSING'
   | 'SHIPPED'
   | 'DELIVERED'
-  | 'REFUNDED';
+  | 'REFUNDED'
+  | 'REFUND_REQUIRED';
 
 export type PaymentStatusValue = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
 
@@ -22,6 +23,7 @@ export function orderStatusLabel(status: OrderStatusValue): string {
     SHIPPED: 'Shipped',
     DELIVERED: 'Delivered',
     REFUNDED: 'Refunded',
+    REFUND_REQUIRED: 'Refund required',
   };
 
   return labels[status] ?? status;
@@ -49,6 +51,8 @@ function orderStatusTone(status: OrderStatusValue): 'success' | 'warning' | 'err
       return 'info';
     case 'PAYMENT_FAILED':
       return 'error';
+    case 'REFUND_REQUIRED':
+      return 'warning';
     case 'CANCELLED':
     case 'REFUNDED':
       return 'default';

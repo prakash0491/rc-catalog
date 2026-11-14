@@ -4,14 +4,7 @@ import Link from 'next/link';
 import { BaseCard, Container, Heading, IconButton, PrimaryButton, Stack, Text, ErrorState } from '@/components/ui';
 import { getPublicContent } from '@/lib/public-content';
 import { getPublicFeaturedProducts } from '@/lib/products';
-
-function formatPrice(price: number) {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(price);
-}
+import { formatPrice } from '@/lib/money';
 
 export async function FeaturedProductsSection() {
   try {

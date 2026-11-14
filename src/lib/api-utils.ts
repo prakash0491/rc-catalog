@@ -25,8 +25,8 @@ export function parsePaginationParams(page?: string, limit?: string) {
   const safeLimit = Number(limit ?? '12');
 
   return {
-    page: Number.isFinite(safePage) && safePage > 0 ? safePage : 1,
-    limit: Number.isFinite(safeLimit) && safeLimit > 0 ? Math.min(safeLimit, 100) : 12,
+    page: Number.isSafeInteger(safePage) && safePage > 0 ? safePage : 1,
+    limit: Number.isSafeInteger(safeLimit) && safeLimit > 0 ? Math.min(safeLimit, 100) : 12,
   };
 }
 

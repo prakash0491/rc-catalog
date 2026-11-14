@@ -27,11 +27,15 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {
       isActive: true,
+      status: 'PUBLISHED',
+      deletedAt: null,
+      category: { isActive: true },
     };
 
     if (category) {
       where.category = {
         slug: category,
+        isActive: true,
       };
     }
 

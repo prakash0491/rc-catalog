@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { Heading, OutlineButton, ResponsiveImage, Text } from '@/components/ui';
 import type { Product } from '@/lib/products';
+import { formatPrice } from '@/lib/money';
 
 import { ProductCard } from './product-card';
 import { ProductList } from './product-list';
@@ -9,14 +10,6 @@ import { ProductList } from './product-list';
 type RelatedProductsProps = {
   products: Product[];
 };
-
-function formatPrice(price: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(price);
-}
 
 export function RelatedProducts({ products }: RelatedProductsProps) {
   if (products.length === 0) {

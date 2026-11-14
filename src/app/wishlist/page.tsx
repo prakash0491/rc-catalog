@@ -5,9 +5,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Heart } from 'lucide-react';
+import { formatPrice } from '@/lib/money';
 
 import { ResponsiveContainer, SectionContainer } from '@/components/common';
-import { BaseCard, EmptyState, Heading, IconButton, PrimaryButton, Text } from '@/components/ui';
+import { Alert, BaseCard, EmptyState, Heading, IconButton, PrimaryButton, Text } from '@/components/ui';
 
 type WishlistItem = {
   id: string;
@@ -25,26 +26,26 @@ type WishlistItem = {
   };
 };
 
-function formatPrice(price: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(price);
-}
-
 export default function WishlistPage() {
   const router = useRouter();
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currency, setCurrency] = useState('INR');
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/wishlist')
       .then((res) => res.json())
       .then((data) => {
-        if (data.success) setItems(data.data.items);
-        else router.push('/login?next=/wishlist');
+        if (data.success) {
+          setItems(data.data.items);
+          if (typeof data.data.currency === 'string') {
+            setCurrency(data.data.currency);
+          }
+        } else {
+          router.push('/login?next=/wishlist');
+        }
       })
       .catch(() => router.push('/login?next=/wishlist'))
       .finally(() => setLoading(false));
@@ -52,25 +53,42 @@ export default function WishlistPage() {
 
   async function handleRemove(productId: string) {
     setRemoving(productId);
+    setFeedback(null);
     try {
-      await fetch(`/api/wishlist/${productId}`, { method: 'DELETE' });
+      const response = await fetch(`/api/wishlist/${productId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        throw new Error('Unable to remove this item right now.');
+      }
       setItems((prev) => prev.filter((item) => item.productId !== productId));
-    } catch {
-      // Silently fail; list stays unchanged
+    } catch (error) {
+      setFeedback({ tone: 'error', text: error instanceof Error ? error.message : 'Unable to remove this item right now.' });
     } finally {
       setRemoving(null);
     }
   }
 
   async function handleAddToCart(productId: string) {
+    setFeedback(null);
     try {
-      await fetch('/api/cart/items', {
+      const response = await fetch('/api/cart/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId, quantity: 1 }),
       });
-    } catch {
-      // Silently fail
+
+      if (response.status === 401) {
+        router.push('/login?next=/wishlist');
+        return;
+      }
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message ?? 'Unable to add this item to your cart.');
+      }
+
+      setFeedback({ tone: 'success', text: 'Added to cart.' });
+    } catch (error) {
+      setFeedback({ tone: 'error', text: error instanceof Error ? error.message : 'Unable to add this item to your cart.' });
     }
   }
 
@@ -95,6 +113,8 @@ export default function WishlistPage() {
           <Heading as="h1" size="h1">My wishlist</Heading>
           <Text variant="muted">{items.length} {items.length === 1 ? 'item' : 'items'} saved</Text>
         </header>
+
+        {feedback ? <Alert tone={feedback.tone}>{feedback.text}</Alert> : null}
 
         {items.length === 0 ? (
           <EmptyState
@@ -126,7 +146,7 @@ export default function WishlistPage() {
                     <Link href={`/products/${item.product.slug}`}>
                       <Heading as="h3" size="h5" className="mt-1 line-clamp-1">{item.product.name}</Heading>
                     </Link>
-                    <span className="mt-1 block text-lg font-bold text-slate-900">{formatPrice(item.product.price)}</span>
+                    <span className="mt-1 block text-lg font-bold text-slate-900">{formatPrice(item.product.price, currency)}</span>
                   </div>
                   <Text variant="muted" className="line-clamp-2 text-sm">{item.product.shortDescription}</Text>
                   <div className="mt-auto flex items-center gap-2 pt-2">

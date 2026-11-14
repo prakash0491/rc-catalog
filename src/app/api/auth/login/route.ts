@@ -7,7 +7,7 @@ import { buildApiError, buildApiSuccess } from '@/lib/api-utils';
 import { GUEST_CART_COOKIE } from '@/lib/auth/customer-constants';
 import { authenticateCustomer } from '@/lib/auth/customer-db';
 import { createCustomerSessionCookie } from '@/lib/auth/customer-session';
-import { mergeGuestCartIntoCustomerCart } from '@/lib/cart';
+import { mergeGuestCartSafely } from '@/lib/cart';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -44,8 +44,7 @@ export async function POST(request: NextRequest) {
 
     const guestSessionId = request.cookies.get(GUEST_CART_COOKIE)?.value;
 
-    if (guestSessionId) {
-      await mergeGuestCartIntoCustomerCart(guestSessionId, session.id);
+    if (guestSessionId && (await mergeGuestCartSafely(guestSessionId, session.id))) {
       response.cookies.set(GUEST_CART_COOKIE, '', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

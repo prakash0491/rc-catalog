@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { buildApiError, buildApiSuccess } from '@/lib/api-utils';
+import { buildApiError, buildApiSuccess, formatZodErrorMessage } from '@/lib/api-utils';
 import { ADMIN_AUTH_COOKIE, verifyAdminSession } from '@/lib/auth/server';
 import { deleteBanner, getAdminBannerById, parseBannerForm, updateBanner, updateBannerActiveState } from '@/lib/banners';
 
@@ -60,7 +60,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     return NextResponse.json(buildApiSuccess(banner));
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(buildApiError('Invalid banner data.', 'INVALID_INPUT'), { status: 400 });
+      return NextResponse.json(buildApiError(formatZodErrorMessage(error), 'INVALID_INPUT'), { status: 400 });
     }
 
     return NextResponse.json(buildApiError('Unable to update banner.', 'INTERNAL_SERVER_ERROR'), { status: 500 });
@@ -86,7 +86,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     return NextResponse.json(buildApiSuccess(banner));
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(buildApiError('Invalid banner data.', 'INVALID_INPUT'), { status: 400 });
+      return NextResponse.json(buildApiError(formatZodErrorMessage(error), 'INVALID_INPUT'), { status: 400 });
     }
 
     return NextResponse.json(buildApiError('Unable to update banner.', 'INTERNAL_SERVER_ERROR'), { status: 500 });

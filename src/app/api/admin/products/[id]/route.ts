@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { buildApiError, buildApiSuccess } from '@/lib/api-utils';
+import { buildApiError, buildApiSuccess, formatZodErrorMessage } from '@/lib/api-utils';
 import { ADMIN_AUTH_COOKIE, verifyAdminSession } from '@/lib/auth/server';
 import {
   buildProductFormInput,
@@ -76,7 +76,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     return NextResponse.json(buildApiSuccess(updatedProduct));
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(buildApiError('Invalid product data.', 'INVALID_INPUT'), { status: 400 });
+      return NextResponse.json(buildApiError(formatZodErrorMessage(error), 'INVALID_INPUT'), { status: 400 });
     }
 
     return NextResponse.json(buildApiError('Unable to update the product.', 'INTERNAL_SERVER_ERROR'), { status: 500 });

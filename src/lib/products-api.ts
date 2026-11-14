@@ -106,7 +106,7 @@ export function normalizeProductForUi(product: ProductApiItem): ProductUiShape {
     featured: product.featured,
     newArrival: product.newArrival,
     stockStatus: product.stockStatus,
-    images: product.images?.map((image) => image.url) ?? ['/images/placeholder.svg'],
+    images: product.images?.length ? product.images.map((image) => image.url) : ['/images/placeholder.svg'],
     tags: [],
   };
 }

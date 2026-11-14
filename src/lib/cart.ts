@@ -1,68 +1,49 @@
 import 'server-only';
 
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/prisma';
 import type { CustomerSession } from '@/lib/auth/customer-types';
 
 // ─── Cart helpers ────────────────────────────────────────────
 
-export async function getOrCreateGuestCart(guestSessionId: string) {
-  let cart = await prisma.cart.findUnique({
-    where: { guestSessionId },
+const CART_ITEMS_INCLUDE = {
+  items: {
     include: {
-      items: {
-        include: {
-          product: { select: { id: true, slug: true, name: true, price: true, mrp: true, stockQuantity: true, stockStatus: true, images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { url: true } } } },
-          variant: { select: { id: true, optionName: true, optionValue: true, priceOverride: true } },
+      product: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          price: true,
+          mrp: true,
+          stockQuantity: true,
+          stockStatus: true,
+          images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { url: true } },
         },
       },
+      variant: { select: { id: true, optionName: true, optionValue: true, priceOverride: true } },
     },
+  },
+} satisfies Prisma.CartInclude;
+
+export async function getOrCreateGuestCart(guestSessionId: string) {
+  // Concurrent first-time requests must not race on the unique cart owner.
+  return prisma.cart.upsert({
+    where: { guestSessionId },
+    create: { guestSessionId },
+    update: {},
+    include: CART_ITEMS_INCLUDE,
   });
-
-  if (!cart) {
-    cart = await prisma.cart.create({
-      data: { guestSessionId },
-      include: {
-        items: {
-          include: {
-            product: { select: { id: true, slug: true, name: true, price: true, mrp: true, stockQuantity: true, stockStatus: true, images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { url: true } } } },
-            variant: { select: { id: true, optionName: true, optionValue: true, priceOverride: true } },
-          },
-        },
-      },
-    });
-  }
-
-  return cart;
 }
 
 export async function getOrCreateCustomerCart(customerId: string) {
-  let cart = await prisma.cart.findUnique({
+  return prisma.cart.upsert({
     where: { customerId },
-    include: {
-      items: {
-        include: {
-          product: { select: { id: true, slug: true, name: true, price: true, mrp: true, stockQuantity: true, stockStatus: true, images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { url: true } } } },
-          variant: { select: { id: true, optionName: true, optionValue: true, priceOverride: true } },
-        },
-      },
-    },
+    create: { customerId },
+    update: {},
+    include: CART_ITEMS_INCLUDE,
   });
-
-  if (!cart) {
-    cart = await prisma.cart.create({
-      data: { customerId },
-      include: {
-        items: {
-          include: {
-            product: { select: { id: true, slug: true, name: true, price: true, mrp: true, stockQuantity: true, stockStatus: true, images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { url: true } } } },
-            variant: { select: { id: true, optionName: true, optionValue: true, priceOverride: true } },
-          },
-        },
-      },
-    });
-  }
-
-  return cart;
 }
 
 export type CartWithItems = Awaited<ReturnType<typeof getOrCreateCustomerCart>>;
@@ -79,10 +60,11 @@ export async function addItemToCart(cartId: string, productId: string, variantId
     throw new Error('PRODUCT_NOT_FOUND');
   }
 
-  if (quantity < 1) {
+  if (!Number.isSafeInteger(quantity) || quantity < 1) {
     throw new Error('INVALID_QUANTITY');
   }
 
+  let availableStock = product.stockQuantity;
   if (variantId) {
     const variant = await prisma.productVariant.findFirst({
       where: { id: variantId, productId, isActive: true },
@@ -92,19 +74,18 @@ export async function addItemToCart(cartId: string, productId: string, variantId
       throw new Error('VARIANT_NOT_FOUND');
     }
 
-    if (quantity > variant.stockQuantity) {
-      throw new Error('INSUFFICIENT_STOCK');
-    }
-  } else if (quantity > product.stockQuantity) {
-    throw new Error('INSUFFICIENT_STOCK');
+    availableStock = variant.stockQuantity;
   }
 
   // Check for existing item
   const existing = await prisma.cartItem.findFirst({
-    where: { cartId, productId, variantId: variantId ?? undefined },
+    where: { cartId, productId, variantId },
   });
 
   if (existing) {
+    if (existing.quantity + quantity > availableStock) {
+      throw new Error('INSUFFICIENT_STOCK');
+    }
     return prisma.cartItem.update({
       where: { id: existing.id },
       data: { quantity: existing.quantity + quantity },
@@ -113,6 +94,10 @@ export async function addItemToCart(cartId: string, productId: string, variantId
         variant: { select: { id: true, optionName: true, optionValue: true, priceOverride: true } },
       },
     });
+  }
+
+  if (quantity > availableStock) {
+    throw new Error('INSUFFICIENT_STOCK');
   }
 
   return prisma.cartItem.create({
@@ -127,9 +112,26 @@ export async function addItemToCart(cartId: string, productId: string, variantId
 // ─── Update cart item quantity ──────────────────────────────
 
 export async function updateCartItemQuantity(cartItemId: string, cartId: string, quantity: number) {
+  if (!Number.isSafeInteger(quantity) || quantity < 0) {
+    throw new Error('INVALID_QUANTITY');
+  }
+  const existing = await prisma.cartItem.findFirst({
+    where: { id: cartItemId, cartId },
+    include: { product: { select: { stockQuantity: true } }, variant: { select: { stockQuantity: true } } },
+  });
+
+  if (!existing) {
+    throw new Error('CART_ITEM_NOT_FOUND');
+  }
+
   if (quantity < 1) {
-    await prisma.cartItem.delete({ where: { id: cartItemId } });
+    await prisma.cartItem.deleteMany({ where: { id: cartItemId, cartId } });
     return null;
+  }
+
+  const availableStock = existing.variant?.stockQuantity ?? existing.product.stockQuantity;
+  if (quantity > availableStock) {
+    throw new Error('INSUFFICIENT_STOCK');
   }
 
   return prisma.cartItem.update({
@@ -145,7 +147,7 @@ export async function updateCartItemQuantity(cartItemId: string, cartId: string,
 // ─── Remove cart item ────────────────────────────────────────
 
 export async function removeCartItem(cartItemId: string, cartId: string) {
-  await prisma.cartItem.delete({ where: { id: cartItemId, cartId } });
+  await prisma.cartItem.deleteMany({ where: { id: cartItemId, cartId } });
 }
 
 // ─── Merge guest cart into customer cart ────────────────────
@@ -190,6 +192,20 @@ export async function mergeGuestCartIntoCustomerCart(guestSessionId: string, cus
 
   // Delete guest cart
   await prisma.cart.delete({ where: { id: guestCart.id } });
+}
+
+/**
+ * Signing in must not fail just because a guest cart could not be merged.
+ * The guest cookie is only cleared when the merge succeeds.
+ */
+export async function mergeGuestCartSafely(guestSessionId: string, customerId: string) {
+  try {
+    await mergeGuestCartIntoCustomerCart(guestSessionId, customerId);
+    return true;
+  } catch (error) {
+    console.error('Guest cart merge failed:', error);
+    return false;
+  }
 }
 
 // ─── Get cart count ──────────────────────────────────────────

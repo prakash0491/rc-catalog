@@ -1,7 +1,7 @@
 import { Badge, Heading, SecondaryButton, Text, WhatsAppButton } from '@/components/ui';
 import type { Product } from '@/lib/products';
-
-import { AddToCartButton } from './add-to-cart-button';
+import { CHECKOUT_CURRENCY, computeDiscountPercent, formatPrice } from '@/lib/money';
+import { ProductPurchaseOptions } from './product-purchase-options';
 import { ProductGallery } from './product-gallery';
 import { ShareButton } from './share-button';
 import { WishlistButton } from './wishlist-button';
@@ -11,14 +11,6 @@ type ProductDetailsProps = {
   whatsappNumber: string;
   initiallyWishlisted?: boolean;
 };
-
-function formatPrice(price: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(price);
-}
 
 function mapStockTone(status: Product['stockStatus']): 'success' | 'warning' | 'error' {
   if (status === 'in-stock') return 'success';
@@ -33,12 +25,10 @@ function formatStockLabel(status: Product['stockStatus']) {
 }
 
 function resolvePricing(product: Product) {
-  if (product.mrp !== null && product.mrp > product.price) {
-    const computed = Math.round(((product.mrp - product.price) / product.mrp) * 100);
-    return {
-      mrp: product.mrp,
-      discountPercent: product.discountPercent > 0 ? product.discountPercent : computed,
-    };
+  const discountPercent = computeDiscountPercent(product.price, product.mrp);
+
+  if (discountPercent > 0 && product.mrp !== null) {
+    return { mrp: product.mrp, discountPercent };
   }
 
   return { mrp: null, discountPercent: 0 };
@@ -103,9 +93,7 @@ export function ProductDetails({ product, whatsappNumber, initiallyWishlisted = 
 
         <Text variant="muted" className="text-slate-600">{product.description}</Text>
 
-        {product.stockStatus !== 'out-of-stock' ? (
-          <AddToCartButton productId={product.id} />
-        ) : null}
+        <ProductPurchaseOptions productId={product.id} stockQuantity={product.stockQuantity} variants={product.variants} currency={CHECKOUT_CURRENCY} />
 
         <div className="flex flex-wrap gap-3">
           <WishlistButton productId={product.id} initiallyWishlisted={initiallyWishlisted} variant="full" />

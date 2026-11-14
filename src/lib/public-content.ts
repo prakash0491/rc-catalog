@@ -79,13 +79,20 @@ function buildFallbackPublicContent(): PublicContentResponse {
 
 export const getPublicContent = cache(async (): Promise<PublicContentResponse> => {
   try {
+    const now = new Date();
     const [businessSettings, heroBanner, offers, categories] = await Promise.all([
       prisma.businessSettings.findFirst({
         orderBy: { createdAt: 'asc' },
       }),
       getActiveHeroBanner(),
       prisma.offer.findMany({
-        where: { isActive: true },
+        where: {
+          isActive: true,
+          AND: [
+            { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+            { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+          ],
+        },
         orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
         take: 4,
         select: {
@@ -120,7 +127,7 @@ export const getPublicContent = cache(async (): Promise<PublicContentResponse> =
       phone: settings?.phone ?? '+1-555-0100',
       whatsapp: settings?.whatsapp ?? '+91',
       address: settings?.address ?? '123 Market Street, Suite 400, New York, NY 10001',
-      openingHours: settings?.businessHours ?? 'Monâ€“Fri: 9:00 AM â€“ 6:00 PM',
+      openingHours: settings?.businessHours ?? 'Mon–Fri: 9:00 AM – 6:00 PM',
       socialLinks: [
         { platform: 'Instagram', url: settings?.instagram ?? 'https://instagram.com' },
         { platform: 'Facebook', url: settings?.facebook ?? 'https://facebook.com' },

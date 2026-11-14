@@ -1,16 +1,24 @@
 import { z } from 'zod';
 
 import { prisma } from '@/lib/prisma';
+import { isSafeWebLink } from '@/lib/safe-url';
+
+const optionalSafeLink = z
+  .string()
+  .trim()
+  .optional()
+  .default('')
+  .refine((value) => !value || isSafeWebLink(value), 'Enter a valid http(s) URL or internal path.');
 
 export const businessSettingsSchema = z.object({
   businessName: z.string().trim().min(2, 'Business name is required.'),
-  logo: z.string().trim().optional().default(''),
+  logo: optionalSafeLink,
   phone: z.string().trim().optional().default(''),
   email: z.string().trim().email('Email must be valid.').optional().or(z.literal('')).default(''),
   whatsapp: z.string().trim().optional().default(''),
-  instagram: z.string().trim().optional().default(''),
-  facebook: z.string().trim().optional().default(''),
-  youtube: z.string().trim().optional().default(''),
+  instagram: optionalSafeLink,
+  facebook: optionalSafeLink,
+  youtube: optionalSafeLink,
   address: z.string().trim().optional().default(''),
   businessHours: z.string().trim().optional().default(''),
   seoTitle: z.string().trim().max(160).optional().default(''),

@@ -11,6 +11,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       where: {
         slug,
         isActive: true,
+        status: 'PUBLISHED',
+        deletedAt: null,
+        category: { isActive: true },
       },
       include: {
         category: true,
@@ -29,6 +32,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         categoryId: product.categoryId,
         id: { not: product.id },
         isActive: true,
+        status: 'PUBLISHED',
+        deletedAt: null,
+        category: { isActive: true },
       },
       take: 4,
       orderBy: { createdAt: 'desc' },

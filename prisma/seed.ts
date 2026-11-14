@@ -1,3 +1,4 @@
+import bcrypt from 'bcrypt';
 import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -277,6 +278,34 @@ const businessSettings = {
   seoDescription: 'A reusable product catalog platform built for modern commerce.',
 } as const;
 
+async function seedAdmin() {
+  const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.SEED_ADMIN_PASSWORD;
+
+  if (!email && !password) {
+    return;
+  }
+
+  if (!email || !password) {
+    console.warn('Skipping admin seed: set both SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD.');
+    return;
+  }
+
+  if (password.length < 8) {
+    throw new Error('SEED_ADMIN_PASSWORD must be at least 8 characters.');
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  await prisma.admin.upsert({
+    where: { email },
+    create: { email, name: 'Store Admin', passwordHash },
+    update: { passwordHash },
+  });
+
+  console.log(`Admin account ready: ${email}`);
+}
+
 async function main() {
   await prisma.$transaction([
     prisma.productImage.deleteMany(),
@@ -308,6 +337,7 @@ async function main() {
 
   await prisma.offer.createMany({ data: [...offers] });
   await prisma.businessSettings.create({ data: businessSettings });
+  await seedAdmin();
 }
 
 main()

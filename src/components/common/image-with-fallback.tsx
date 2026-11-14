@@ -12,7 +12,8 @@ type ImageWithFallbackProps = Omit<ImageProps, 'src' | 'onError'> & {
 
 export function ImageWithFallback({ src, alt, fallback = DEFAULT_FALLBACK, ...rest }: ImageWithFallbackProps) {
   const initialSrc = src && src.trim().length > 0 ? src : fallback;
-  const [currentSrc, setCurrentSrc] = useState(initialSrc);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const currentSrc = failedSrc === initialSrc ? fallback : initialSrc;
 
   return (
     <Image
@@ -21,7 +22,7 @@ export function ImageWithFallback({ src, alt, fallback = DEFAULT_FALLBACK, ...re
       alt={alt}
       onError={() => {
         if (currentSrc !== fallback) {
-          setCurrentSrc(fallback);
+          setFailedSrc(initialSrc);
         }
       }}
     />

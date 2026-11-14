@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { buildApiError, buildApiSuccess, parsePaginationParams, parseQueryParam } from '@/lib/api-utils';
+import { buildApiError, buildApiSuccess, formatZodErrorMessage, parsePaginationParams, parseQueryParam } from '@/lib/api-utils';
 import { ADMIN_AUTH_COOKIE, verifyAdminSession } from '@/lib/auth/server';
 import { createBanner, listAdminBanners, parseBannerForm } from '@/lib/banners';
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(buildApiSuccess(banner), { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(buildApiError('Invalid banner data.', 'INVALID_INPUT'), { status: 400 });
+      return NextResponse.json(buildApiError(formatZodErrorMessage(error), 'INVALID_INPUT'), { status: 400 });
     }
 
     return NextResponse.json(buildApiError('Unable to create banner.', 'INTERNAL_SERVER_ERROR'), { status: 500 });

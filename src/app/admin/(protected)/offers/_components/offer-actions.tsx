@@ -3,15 +3,17 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { Checkbox, Input, Textarea } from '@/components/ui';
+import { Checkbox, Input, Textarea, Alert } from '@/components/ui';
 
 export function OfferCreateForm() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
+    setErrorMessage(null);
 
     try {
       const response = await fetch('/api/admin/offers', {
@@ -20,11 +22,14 @@ export function OfferCreateForm() {
       });
 
       if (!response.ok) {
-        throw new Error('Unable to create offer.');
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message || 'Unable to create offer.');
       }
 
       event.currentTarget.reset();
       router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to create offer.');
     } finally {
       setIsSubmitting(false);
     }
@@ -32,6 +37,7 @@ export function OfferCreateForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+      {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
       <div className="grid gap-4 md:grid-cols-2">
         <Input name="title" placeholder="Offer title" required />
         <Input name="priority" type="number" min="0" defaultValue="0" placeholder="Priority" />
@@ -52,6 +58,7 @@ export function OfferCreateForm() {
 export function DeleteOfferButton({ offerId }: { offerId: string }) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleDelete = async () => {
     if (!window.confirm('Delete this offer?')) {
@@ -59,23 +66,30 @@ export function DeleteOfferButton({ offerId }: { offerId: string }) {
     }
 
     setIsDeleting(true);
+    setErrorMessage(null);
 
     try {
       const response = await fetch(`/api/admin/offers/${offerId}`, { method: 'DELETE' });
 
       if (!response.ok) {
-        throw new Error('Unable to delete offer.');
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message || 'Unable to delete offer.');
       }
 
       router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to delete offer.');
     } finally {
       setIsDeleting(false);
     }
   };
 
   return (
-    <button type="button" disabled={isDeleting} onClick={handleDelete} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50">
-      {isDeleting ? 'Deleting...' : 'Delete'}
-    </button>
+    <div className="flex flex-col items-end gap-1">
+      <button type="button" disabled={isDeleting} onClick={handleDelete} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50">
+        {isDeleting ? 'Deleting...' : 'Delete'}
+      </button>
+      {errorMessage ? <span role="alert" className="text-xs text-rose-700">{errorMessage}</span> : null}
+    </div>
   );
 }

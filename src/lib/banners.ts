@@ -2,6 +2,7 @@ import { Banner, Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import { prisma } from '@/lib/prisma';
+import { isSafeWebLink } from '@/lib/safe-url';
 
 export const ADMIN_BANNERS_PAGE_SIZE = 10;
 
@@ -37,7 +38,7 @@ export const bannerFormSchema = z.object({
     .trim()
     .optional()
     .default('')
-    .refine((value) => !value || value.startsWith('/') || z.string().url().safeParse(value).success, {
+    .refine((value) => !value || isSafeWebLink(value), {
       message: 'Button URL must be an internal path or a valid URL.',
     }),
   priority: z.coerce.number().int().min(0, 'Priority must be zero or greater.').optional().default(0),

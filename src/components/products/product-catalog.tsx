@@ -13,6 +13,7 @@ import {
   Text,
 } from '@/components/ui';
 import type { ProductSortOption, PublicProductListItem } from '@/lib/products';
+import { formatPrice } from '@/lib/money';
 
 import { WishlistButton } from '@/components/product/wishlist-button';
 
@@ -57,14 +58,6 @@ function formatStockStatus(status: PublicProductListItem['stockStatus']) {
   if (status === 'in-stock') return 'In stock';
   if (status === 'low-stock') return 'Low stock';
   return 'Out of stock';
-}
-
-function formatPrice(price: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(price);
 }
 
 function buildHref(basePath: string, params: ProductCatalogProps['filters'] & { page?: number }) {

@@ -123,7 +123,7 @@ export const adminProductFormSchema = z.object({
   shortDescription: z.string().trim().min(10, 'Short description is required.'),
   description: z.string().trim().min(20, 'Description is required.'),
   price: z.coerce.number().positive('Selling price must be greater than zero.'),
-  mrp: z.coerce.number().nonnegative().optional().or(z.literal('')).default(''),
+  mrp: z.union([z.literal(''), z.coerce.number().nonnegative()]).optional().default(''),
   discountPercent: z.coerce.number().int().min(0).max(100).optional().default(0),
   sku: optionalTrimmed,
   stockQuantity: z.coerce.number().int().min(0).optional().default(0),
@@ -327,7 +327,7 @@ export function serializeAdminProduct(product: AdminProductRecord): AdminProduct
       optionName: variant.optionName,
       optionValue: variant.optionValue,
       sku: variant.sku,
-      priceOverride: variant.priceOverride ? Number(variant.priceOverride) : null,
+      priceOverride: variant.priceOverride === null ? null : Number(variant.priceOverride),
       stockQuantity: variant.stockQuantity,
       sortOrder: variant.sortOrder,
       isActive: variant.isActive,
@@ -501,7 +501,10 @@ export async function updateAdminProduct(id: string, input: AdminProductFormInpu
 
     await tx.productImage.deleteMany({ where: { productId: existing.id } });
     await tx.productSpecification.deleteMany({ where: { productId: existing.id } });
-    await tx.productVariant.deleteMany({ where: { productId: existing.id } });
+    // Cart items reference variant IDs. Preserve existing identities instead of
+    // deleting/recreating every option on each product edit.
+    const existingVariants = await tx.productVariant.findMany({ where: { productId: existing.id } });
+    const retainedVariantIds = new Set<string>();
 
     if (images.length > 0) {
       await tx.productImage.createMany({
@@ -526,10 +529,10 @@ export async function updateAdminProduct(id: string, input: AdminProductFormInpu
       });
     }
 
-    if (input.variants.length > 0) {
-      await tx.productVariant.createMany({
-        data: input.variants.map((variant, index) => ({
-          productId: existing.id,
+    for (const [index, variant] of input.variants.entries()) {
+      const previous = existingVariants.find((saved) => saved.optionName === variant.optionName &&
+        saved.optionValue === variant.optionValue && !retainedVariantIds.has(saved.id));
+      const data = {
           optionName: variant.optionName,
           optionValue: variant.optionValue,
           sku: variant.sku,
@@ -537,8 +540,19 @@ export async function updateAdminProduct(id: string, input: AdminProductFormInpu
           stockQuantity: variant.stockQuantity,
           sortOrder: index,
           isActive: variant.isActive,
-        })),
-      });
+      };
+      if (previous) {
+        retainedVariantIds.add(previous.id);
+        await tx.productVariant.update({ where: { id: previous.id }, data });
+      } else {
+        await tx.productVariant.create({ data: { productId: existing.id, ...data } });
+      }
+    }
+    const removedIds = existingVariants.filter((variant) => !retainedVariantIds.has(variant.id)).map((variant) => variant.id);
+    if (removedIds.length > 0) {
+      // Removed options must remain addressable by existing carts; checkout
+      // rejects inactive variants and asks the customer to review their cart.
+      await tx.productVariant.updateMany({ where: { id: { in: removedIds } }, data: { isActive: false } });
     }
 
     return tx.product.findUnique({
@@ -660,6 +674,8 @@ export async function bulkUpdateProducts(ids: string[], action: 'delete' | 'publ
   const result = await prisma.product.updateMany({
     where: {
       id: { in: ids },
+      // Never revive a soft-deleted product through a bulk action.
+      deletedAt: null,
     },
     data,
   });

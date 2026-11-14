@@ -9,7 +9,7 @@ import { getOrCreateCustomerCart, getOrCreateGuestCart, updateCartItemQuantity, 
 import { getGuestSessionId } from '@/lib/guest-session';
 
 const updateSchema = z.object({
-  quantity: z.number().int().min(0),
+  quantity: z.number().int().min(0).max(100000, 'Quantity is too large.'),
 });
 
 async function getCartForCurrentUser() {
@@ -59,6 +59,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     return NextResponse.json(buildApiSuccess({ item: updated }));
   } catch (error) {
+    if (error instanceof Error && error.message === 'INVALID_QUANTITY') {
+      return NextResponse.json(buildApiError('Invalid quantity.', 'INVALID_QUANTITY'), { status: 400 });
+    }
+    if (error instanceof Error && error.message === 'CART_ITEM_NOT_FOUND') {
+      return NextResponse.json(buildApiError('Item not found in cart.', 'ITEM_NOT_FOUND'), { status: 404 });
+    }
+    if (error instanceof Error && error.message === 'INSUFFICIENT_STOCK') {
+      return NextResponse.json(buildApiError('Requested quantity exceeds available stock.', 'INSUFFICIENT_STOCK'), { status: 409 });
+    }
     console.error('Update cart item error:', error);
     return NextResponse.json(buildApiError('Unable to update cart item.', 'INTERNAL_SERVER_ERROR'), { status: 500 });
   }

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 
 import { ResponsiveContainer, SectionContainer } from '@/components/common';
-import { BaseCard, EmptyState, Heading, IconButton, PrimaryButton, Text } from '@/components/ui';
+import { Alert, BaseCard, EmptyState, Heading, IconButton, PrimaryButton, Text } from '@/components/ui';
 import { formatPrice } from '@/lib/money';
 
 type CartItem = {
@@ -41,21 +41,32 @@ function computeItemPrice(product: CartItem['product'], variant: CartItem['varia
   if (variant?.priceOverride !== null && variant?.priceOverride !== undefined) {
     return Number(variant.priceOverride);
   }
-  return product.price;
+  return Number(product.price);
 }
 
 export default function CartPage() {
   const [cart, setCart] = useState<Cart>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [currency, setCurrency] = useState('INR');
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const fetchCart = useCallback(async () => {
     try {
       const res = await fetch('/api/cart');
-      const data = await res.json();
-      if (data.success) setCart(data.data.cart);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        setFeedback(data?.error?.message ?? 'Unable to load your cart.');
+        return;
+      }
+
+      setCart(data.data.cart);
+      if (typeof data.data.currency === 'string') {
+        setCurrency(data.data.currency);
+      }
     } catch {
-      // Cart stays empty/null
+      setFeedback('Unable to load your cart.');
     } finally {
       setLoading(false);
     }
@@ -72,18 +83,22 @@ export default function CartPage() {
     }
 
     setUpdating(itemId);
+    setFeedback(null);
     try {
       const res = await fetch(`/api/cart/items/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quantity: newQuantity }),
       });
-      const data = await res.json();
-      if (data.success) {
-        await fetchCart();
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error?.message ?? 'Unable to update the quantity.');
       }
-    } catch {
-      // Revert silently
+
+      await fetchCart();
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Unable to update the quantity.');
     } finally {
       setUpdating(null);
     }
@@ -91,11 +106,18 @@ export default function CartPage() {
 
   async function handleRemoveItem(itemId: string) {
     setUpdating(itemId);
+    setFeedback(null);
     try {
-      await fetch(`/api/cart/items/${itemId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/cart/items/${itemId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error?.message ?? 'Unable to remove this item.');
+      }
+
       await fetchCart();
-    } catch {
-      // Revert silently
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Unable to remove this item.');
     } finally {
       setUpdating(null);
     }
@@ -127,6 +149,8 @@ export default function CartPage() {
             {items.length} {items.length === 1 ? 'item' : 'items'}
           </Text>
         </header>
+
+        {feedback ? <Alert tone="error">{feedback}</Alert> : null}
 
         {items.length === 0 ? (
           <EmptyState
@@ -167,7 +191,7 @@ export default function CartPage() {
                           </Text>
                         ) : null}
                         <Text variant="small" className="mt-0.5 font-bold text-slate-900">
-                          {formatPrice(itemPrice)}
+                          {formatPrice(itemPrice, currency)}
                         </Text>
                       </div>
 
@@ -198,7 +222,7 @@ export default function CartPage() {
 
                         <div className="flex items-center gap-3">
                           <Text variant="small" className="font-bold text-slate-900">
-                            {formatPrice(lineTotal)}
+                            {formatPrice(lineTotal, currency)}
                           </Text>
                           <IconButton
                             icon={<Trash2 className="h-4 w-4 text-rose-500" />}
@@ -221,7 +245,7 @@ export default function CartPage() {
                 <div className="space-y-2 border-t border-slate-100 pt-4">
                   <div className="flex justify-between text-sm text-slate-600">
                     <span>Subtotal</span>
-                    <span className="font-semibold text-slate-900">{formatPrice(subtotal)}</span>
+                    <span className="font-semibold text-slate-900">{formatPrice(subtotal, currency)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-slate-500">
                     <span>Shipping</span>
@@ -231,7 +255,7 @@ export default function CartPage() {
                 <div className="border-t border-slate-100 pt-4">
                   <div className="flex justify-between">
                     <span className="font-bold text-slate-900">Total</span>
-                    <span className="text-xl font-bold text-slate-900">{formatPrice(subtotal)}</span>
+                    <span className="text-xl font-bold text-slate-900">{formatPrice(subtotal, currency)}</span>
                   </div>
                 </div>
                 <Link href="/checkout" className="block w-full">

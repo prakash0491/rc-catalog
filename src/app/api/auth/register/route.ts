@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import { buildApiError, buildApiSuccess } from '@/lib/api-utils';
@@ -8,7 +9,7 @@ import { GUEST_CART_COOKIE } from '@/lib/auth/customer-constants';
 import { createCustomer, findCustomerByEmail } from '@/lib/auth/customer-db';
 import { createCustomerSessionCookie } from '@/lib/auth/customer-session';
 import type { CustomerSession } from '@/lib/auth/customer-types';
-import { mergeGuestCartIntoCustomerCart } from '@/lib/cart';
+import { mergeGuestCartSafely } from '@/lib/cart';
 
 const registerSchema = z.object({
   name: z.string().min(1, 'Name is required').max(120),
@@ -55,8 +56,7 @@ export async function POST(request: NextRequest) {
 
     const guestSessionId = request.cookies.get(GUEST_CART_COOKIE)?.value;
 
-    if (guestSessionId) {
-      await mergeGuestCartIntoCustomerCart(guestSessionId, customer.id);
+    if (guestSessionId && (await mergeGuestCartSafely(guestSessionId, customer.id))) {
       response.cookies.set(GUEST_CART_COOKIE, '', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -68,6 +68,15 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
+    // Two concurrent registrations can pass the lookup above; the unique
+    // constraint is the source of truth.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json(
+        buildApiError('An account with this email already exists.', 'DUPLICATE_EMAIL'),
+        { status: 409 }
+      );
+    }
+
     console.error('Registration error:', error);
     return NextResponse.json(
       buildApiError('Unable to complete registration.', 'INTERNAL_SERVER_ERROR'),

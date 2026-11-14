@@ -18,8 +18,10 @@ export function AddToCartButton({ productId, variantId = null, className }: AddT
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleAdd() {
+    setError('');
     setLoading(true);
 
     try {
@@ -35,9 +37,12 @@ export function AddToCartButton({ productId, variantId = null, className }: AddT
         router.refresh();
       } else if (res.status === 401) {
         router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      } else {
+        const payload = await res.json().catch(() => null);
+        setError(payload?.error?.message ?? 'Unable to add this item to your cart.');
       }
     } catch {
-      // Silently fail
+      setError('Unable to add this item to your cart. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -80,6 +85,7 @@ export function AddToCartButton({ productId, variantId = null, className }: AddT
           </>
         )}
       </PrimaryButton>
+      {error ? <p role="alert" className="w-full text-sm text-rose-700">{error}</p> : null}
     </div>
   );
 }

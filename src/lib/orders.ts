@@ -235,11 +235,11 @@ function assertCartReady(raw: { items: LoadedCartItem[] }) {
   }
 }
 
-async function findReusablePendingOrder(customerId: string, total: Prisma.Decimal) {
+async function findReusablePendingOrder(customerId: string, raw: { total: Prisma.Decimal; items: LoadedCartItem[] }) {
   const order = await prisma.order.findFirst({
     where: { customerId, status: 'PENDING_PAYMENT' },
     orderBy: { createdAt: 'desc' },
-    include: { payments: { orderBy: { createdAt: 'desc' }, take: 1 } },
+    include: { items: true, payments: { orderBy: { createdAt: 'desc' }, take: 1 } },
   });
 
   if (!order) {
@@ -252,7 +252,15 @@ async function findReusablePendingOrder(customerId: string, total: Prisma.Decima
     return null;
   }
 
-  if (!order.total.equals(total)) {
+  if (!order.total.equals(raw.total) || order.currency !== CHECKOUT_CURRENCY) {
+    return null;
+  }
+
+  // Equal totals do not imply the same purchase. Match immutable line snapshots.
+  if (order.items.length !== raw.items.length || !raw.items.every((item) =>
+    order.items.some((saved) => saved.productId === item.productId &&
+      saved.variantId === item.variantId && saved.quantity === item.quantity && saved.price.equals(item.unitPrice))
+  )) {
     return null;
   }
 
@@ -289,9 +297,9 @@ export async function createCheckoutOrder(customerId: string): Promise<CreateChe
 
   const orderNumber = generateOrderNumber();
 
-  // Reuse an open pending order for the same server-calculated total so that
+  // Reuse an open pending order for the same cart snapshot so that
   // refreshes / re-opened checkouts do not create duplicate orders.
-  const reusable = await findReusablePendingOrder(customerId, raw.total);
+  const reusable = await findReusablePendingOrder(customerId, raw);
 
   if (reusable) {
     return {
@@ -368,15 +376,48 @@ export async function createCheckoutOrder(customerId: string): Promise<CreateChe
 // ─── Payment finalization (shared by verification & webhook) ─
 
 async function markPaymentFailed(paymentId: string, orderId: string) {
-  await prisma.payment.updateMany({
-    where: { id: paymentId, status: { in: ['PENDING', 'FAILED'] } },
-    data: { status: 'FAILED' },
-  });
+  await prisma.$transaction([
+    prisma.payment.updateMany({
+      where: { id: paymentId, status: { in: ['PENDING', 'FAILED'] } },
+      data: { status: 'FAILED' },
+    }),
+    prisma.order.updateMany({
+      where: { id: orderId, status: 'PENDING_PAYMENT' },
+      data: { status: 'PAYMENT_FAILED' },
+    }),
+  ]);
+}
 
-  await prisma.order.updateMany({
-    where: { id: orderId, status: 'PENDING_PAYMENT' },
-    data: { status: 'PAYMENT_FAILED' },
-  });
+/**
+ * The provider captured the money, but the order could not reserve stock.
+ * Recording the charge as PAID (instead of FAILED) keeps the ledger honest and
+ * marks the order for a manual refund. Never call markPaymentFailed here.
+ */
+async function markCapturedPaymentForRefund(params: {
+  paymentId: string;
+  orderId: string;
+  providerPaymentId: string;
+  razorpaySignature: string | null;
+}) {
+  await prisma.$transaction([
+    prisma.payment.updateMany({
+      where: { id: params.paymentId, status: { in: ['PENDING', 'FAILED'] } },
+      data: {
+        status: 'PAID',
+        providerPaymentId: params.providerPaymentId,
+        razorpaySignature: params.razorpaySignature,
+      },
+    }),
+    prisma.order.updateMany({
+      where: { id: params.orderId, status: { in: ['PENDING_PAYMENT', 'PAYMENT_FAILED'] } },
+      data: { status: 'REFUND_REQUIRED' },
+    }),
+  ]);
+
+  console.error(
+    `Captured payment ${params.providerPaymentId} for order ${params.orderId} could not reserve inventory. ` +
+      'Order marked REFUND_REQUIRED; issue a refund in the payment provider dashboard.'
+  );
 }
 
 export async function finalizePaidOrder(params: {
@@ -433,7 +474,15 @@ export async function finalizePaidOrder(params: {
     const cart = await tx.cart.findUnique({ where: { customerId } });
 
     if (cart) {
-      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+      // A delayed webhook must not erase items added after checkout started.
+      for (const item of orderItems) {
+        const where = { cartId: cart.id, productId: item.productId, variantId: item.variantId };
+        await tx.cartItem.deleteMany({ where: { ...where, quantity: { lte: item.quantity } } });
+        await tx.cartItem.updateMany({
+          where: { ...where, quantity: { gt: item.quantity } },
+          data: { quantity: { decrement: item.quantity } },
+        });
+      }
     }
 
     return { alreadyProcessed: false };
@@ -477,33 +526,52 @@ export async function verifyCheckoutPayment(params: {
 
   // Confirm the amount charged matches the server-calculated order total.
   const razorpayPayment = await fetchRazorpayPayment(razorpayPaymentId);
+  if (razorpayPayment.order_id !== razorpayOrderId) {
+    throw new Error('VERIFICATION_FAILED');
+  }
+
+  if (razorpayPayment.status !== 'captured') {
+    // Authorization alone is not settled payment. Leave pending captures
+    // available for the capture webhook rather than marking them failed.
+    throw new Error('PAYMENT_NOT_CAPTURED');
+  }
   const expectedAmount = toRazorpayAmount(Number(payment.order.total), payment.order.currency);
 
   if (
     Number(razorpayPayment.amount) !== expectedAmount ||
     razorpayPayment.currency !== payment.order.currency
   ) {
-    await markPaymentFailed(payment.id, payment.orderId);
+    await markCapturedPaymentForRefund({
+      paymentId: payment.id,
+      orderId: payment.orderId,
+      providerPaymentId: razorpayPaymentId,
+      razorpaySignature,
+    });
     throw new Error('AMOUNT_MISMATCH');
   }
 
   try {
-    await finalizePaidOrder({
+    const result = await finalizePaidOrder({
       paymentId: payment.id,
       orderId: payment.orderId,
       customerId: payment.order.customerId,
       providerPaymentId: razorpayPaymentId,
       razorpaySignature,
     });
+    return { orderId: payment.orderId, alreadyProcessed: result.alreadyProcessed };
   } catch (error) {
     if (error instanceof Error && error.message === 'STOCK_CONFLICT') {
-      await markPaymentFailed(payment.id, payment.orderId);
+      await markCapturedPaymentForRefund({
+        paymentId: payment.id,
+        orderId: payment.orderId,
+        providerPaymentId: razorpayPaymentId,
+        razorpaySignature,
+      });
       throw error;
     }
     throw error;
   }
 
-  return { orderId: payment.orderId, alreadyProcessed: false };
 }
 
 // ─── Webhook handling ───────────────────────────────────────
@@ -542,6 +610,9 @@ export async function handleRazorpayWebhookEvent(payload: RazorpayWebhookPayload
 
   // payment.captured → finalize the order (idempotent).
   if (event === 'payment.captured') {
+    if (!paymentEntity.id || paymentEntity.currency !== payment.order.currency) {
+      return { handled: false };
+    }
     if (payment.status === 'PAID') {
       return { handled: true };
     }
@@ -552,12 +623,19 @@ export async function handleRazorpayWebhookEvent(payload: RazorpayWebhookPayload
       Number(paymentEntity.amount ?? 0) !== expectedAmount ||
       (paymentEntity.currency && paymentEntity.currency !== payment.order.currency)
     ) {
-      // Amount mismatch: do not finalize. Log for investigation.
+      // The provider captured money, but not the amount we asked for.
+      // Never mark this as a failed payment; flag it for manual refund.
       console.error(
         `Razorpay webhook amount mismatch for order ${payment.order.orderNumber}: ` +
           `expected ${expectedAmount} ${payment.order.currency}, got ${paymentEntity.amount} ${paymentEntity.currency}`
       );
-      return { handled: false };
+      await markCapturedPaymentForRefund({
+        paymentId: payment.id,
+        orderId: payment.orderId,
+        providerPaymentId: paymentEntity.id,
+        razorpaySignature: null,
+      });
+      return { handled: true };
     }
 
     try {
@@ -565,13 +643,18 @@ export async function handleRazorpayWebhookEvent(payload: RazorpayWebhookPayload
         paymentId: payment.id,
         orderId: payment.orderId,
         customerId: payment.order.customerId,
-        providerPaymentId: paymentEntity.id ?? '',
+        providerPaymentId: paymentEntity.id,
         razorpaySignature: null,
       });
       return { handled: true };
     } catch (error) {
       if (error instanceof Error && error.message === 'STOCK_CONFLICT') {
-        await markPaymentFailed(payment.id, payment.orderId);
+        await markCapturedPaymentForRefund({
+          paymentId: payment.id,
+          orderId: payment.orderId,
+          providerPaymentId: paymentEntity.id,
+          razorpaySignature: null,
+        });
       }
       throw error;
     }

@@ -130,6 +130,7 @@ async function findProductRecordBySlug(slug: string) {
       isActive: true,
       status: ProductStatus.PUBLISHED,
       deletedAt: null,
+      category: { isActive: true },
     },
     include: {
       category: true,
@@ -140,6 +141,7 @@ async function findProductRecordBySlug(slug: string) {
         orderBy: { sortOrder: 'asc' },
       },
       variants: {
+        where: { isActive: true },
         orderBy: { sortOrder: 'asc' },
       },
     },
@@ -154,6 +156,7 @@ async function findRelatedProductRecords(categoryId: string, excludeId: string, 
       isActive: true,
       status: ProductStatus.PUBLISHED,
       deletedAt: null,
+      category: { isActive: true },
     },
     take: limit,
     orderBy: { createdAt: 'desc' },
@@ -166,6 +169,7 @@ async function findRelatedProductRecords(categoryId: string, excludeId: string, 
         orderBy: { sortOrder: 'asc' },
       },
       variants: {
+        where: { isActive: true },
         orderBy: { sortOrder: 'asc' },
       },
     },
@@ -286,6 +290,7 @@ export async function getPublicFeaturedProducts(limit = 6): Promise<Product[]> {
       featured: true,
       status: ProductStatus.PUBLISHED,
       deletedAt: null,
+      category: { isActive: true },
     },
     orderBy: { createdAt: 'desc' },
     take: limit,
@@ -316,6 +321,7 @@ export async function getPublicFeaturedProducts(limit = 6): Promise<Product[]> {
         },
       },
       variants: {
+        where: { isActive: true },
         orderBy: { sortOrder: 'asc' },
         select: {
           id: true,
@@ -405,6 +411,7 @@ export async function listPublicProducts(params: PublicProductListParams) {
     isActive: true,
     status: ProductStatus.PUBLISHED,
     deletedAt: null,
+    category: { isActive: true },
   };
 
   if (params.category) {
@@ -482,6 +489,7 @@ export async function listPublicProducts(params: PublicProductListParams) {
           },
         },
         variants: {
+          where: { isActive: true },
           orderBy: { sortOrder: 'asc' },
           select: {
             id: true,
@@ -565,7 +573,7 @@ export function parseProductListQuery(
     sortRaw && PRODUCT_SORT_OPTIONS.has(sortRaw as ProductSortOption) ? (sortRaw as ProductSortOption) : 'featured';
 
   const pageValue = Number(read('page'));
-  const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
 
   return {
     search,
@@ -586,6 +594,7 @@ export async function getProductSearchSuggestions(query: string, limit = 5) {
         isActive: true,
         status: ProductStatus.PUBLISHED,
         deletedAt: null,
+        category: { isActive: true },
         OR: [
           { name: { contains: query, mode: 'insensitive' } },
           { shortDescription: { contains: query, mode: 'insensitive' } },

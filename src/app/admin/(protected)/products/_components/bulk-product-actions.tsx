@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { Alert } from '@/components/ui';
+
 type BulkProductActionsProps = {
   products: Array<{ id: string; name: string }>;
 };
@@ -13,6 +15,7 @@ export function BulkProductActions({ products }: BulkProductActionsProps) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const toggleAll = () => {
     setSelectedIds((current) => current.length === products.length ? [] : products.map((product) => product.id));
@@ -32,6 +35,7 @@ export function BulkProductActions({ products }: BulkProductActionsProps) {
     }
 
     setIsSubmitting(true);
+    setErrorMessage(null);
 
     try {
       const response = await fetch('/api/admin/products', {
@@ -41,11 +45,14 @@ export function BulkProductActions({ products }: BulkProductActionsProps) {
       });
 
       if (!response.ok) {
-        throw new Error('Unable to update products.');
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message || 'Unable to update products.');
       }
 
       setSelectedIds([]);
       router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to update products.');
     } finally {
       setIsSubmitting(false);
     }
@@ -53,6 +60,7 @@ export function BulkProductActions({ products }: BulkProductActionsProps) {
 
   return (
     <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
+      {errorMessage ? <Alert tone="error" className="mb-4">{errorMessage}</Alert> : null}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <button

@@ -67,6 +67,13 @@ export async function POST(request: Request) {
         );
       }
 
+      if (error.message === 'PAYMENT_NOT_CAPTURED') {
+        return NextResponse.json(
+          buildApiError('Payment capture is pending. Please check your order status shortly.', 'PAYMENT_NOT_CAPTURED'),
+          { status: 409 }
+        );
+      }
+
       if (error instanceof RazorpayConfigError) {
         return NextResponse.json(buildApiError(error.message, 'PAYMENT_NOT_CONFIGURED'), { status: 503 });
       }

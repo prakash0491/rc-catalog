@@ -22,11 +22,12 @@ export function Divider({ className, ...props }: DividerProps) {
   return <hr className={cn('my-6 border-slate-200', className)} {...props} />;
 }
 
-export function EmptyState({ title, description, className, ...props }: EmptyStateProps) {
+export function EmptyState({ title, description, className, children, ...props }: EmptyStateProps) {
   return (
     <div className={cn('rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center', className)} {...props}>
       <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
       {description ? <p className="mt-2 text-sm text-slate-600">{description}</p> : null}
+      {children}
     </div>
   );
 }

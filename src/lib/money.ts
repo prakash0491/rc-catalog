@@ -9,7 +9,7 @@ export function formatPrice(amount: number, currency: string = CHECKOUT_CURRENCY
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
   }).format(amount);
 }
 
@@ -29,4 +29,20 @@ function currencyDecimals(currency: string): number {
 export function toRazorpayAmount(amount: number, currency = CHECKOUT_CURRENCY): number {
   const decimals = currencyDecimals(currency);
   return Math.round(amount * 10 ** decimals);
+}
+
+/**
+ * Discount badges must agree with the prices shown to the customer. A stored
+ * percentage can drift from MRP/price when an admin edits one field only.
+ */
+export function computeDiscountPercent(price: number, mrp: number | null | undefined): number {
+  if (!Number.isFinite(price) || !Number.isFinite(mrp ?? NaN) || mrp === null || mrp === undefined) {
+    return 0;
+  }
+
+  if (mrp <= price || mrp <= 0 || price < 0) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(((mrp - price) / mrp) * 100)));
 }

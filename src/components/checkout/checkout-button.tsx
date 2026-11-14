@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Lock } from 'lucide-react';
 
 import { Alert, PrimaryButton, Text } from '@/components/ui';
+import { formatPrice } from '@/lib/money';
 
 type RazorpayCheckoutOptions = {
   key: string;
@@ -156,7 +157,7 @@ export function CheckoutButton({
 
       <PrimaryButton type="button" onClick={handlePay} loading={loading} disabled={disabled} className="w-full gap-2">
         {!loading ? <Lock className="h-4 w-4" /> : null}
-        {loading ? 'Preparing payment…' : `Pay ${formatCheckoutPrice(total, currency)}`}
+        {loading ? 'Preparing payment…' : `Pay ${formatPrice(total, currency)}`}
       </PrimaryButton>
 
       <Text variant="caption" className="text-center text-slate-400">
@@ -166,10 +167,3 @@ export function CheckoutButton({
   );
 }
 
-function formatCheckoutPrice(amount: number, currency: string) {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}

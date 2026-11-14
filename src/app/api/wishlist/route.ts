@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 
 import { buildApiError, buildApiSuccess } from '@/lib/api-utils';
 import { getCustomerSession } from '@/lib/auth/customer-session';
+import { CHECKOUT_CURRENCY } from '@/lib/money';
 import { addProductToWishlist, getWishlistForCustomer } from '@/lib/wishlist';
 
 export async function GET() {
@@ -15,7 +16,16 @@ export async function GET() {
     }
 
     const items = await getWishlistForCustomer(session.id);
-    return NextResponse.json(buildApiSuccess({ items }));
+    const serializedItems = items.map((item) => ({
+      ...item,
+      product: {
+        ...item.product,
+        price: Number(item.product.price),
+        mrp: item.product.mrp === null ? null : Number(item.product.mrp),
+      },
+    }));
+
+    return NextResponse.json(buildApiSuccess({ items: serializedItems, currency: CHECKOUT_CURRENCY }));
   } catch (error) {
     console.error('Get wishlist error:', error);
     return NextResponse.json(buildApiError('Unable to load wishlist.', 'INTERNAL_SERVER_ERROR'), { status: 500 });

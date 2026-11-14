@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ProductStatus } from '@prisma/client';
 import { z } from 'zod';
 
-import { buildApiError, buildApiSuccess, parsePaginationParams, parseQueryParam } from '@/lib/api-utils';
+import { buildApiError, buildApiSuccess, formatZodErrorMessage, parsePaginationParams, parseQueryParam } from '@/lib/api-utils';
 import { ADMIN_AUTH_COOKIE, verifyAdminSession } from '@/lib/auth/server';
 import {
   buildProductFormInput,
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(buildApiSuccess(createdProduct), { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(buildApiError('Invalid product data.', 'INVALID_INPUT'), { status: 400 });
+      return NextResponse.json(buildApiError(formatZodErrorMessage(error), 'INVALID_INPUT'), { status: 400 });
     }
 
     return NextResponse.json(buildApiError('Unable to create the product.', 'INTERNAL_SERVER_ERROR'), { status: 500 });
