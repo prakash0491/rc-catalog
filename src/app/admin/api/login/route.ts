@@ -18,17 +18,17 @@ export async function POST(request: NextRequest) {
   });
 
   if (!parsed.success) {
-    return NextResponse.redirect(new URL(`${ADMIN_LOGIN_PATH}?error=invalid`, request.url));
+    return NextResponse.redirect(new URL(`${ADMIN_LOGIN_PATH}?error=invalid`, request.url), 303);
   }
 
   const adminSession = await authenticateAdmin(parsed.data.email, parsed.data.password);
 
   if (!adminSession) {
-    return NextResponse.redirect(new URL(`${ADMIN_LOGIN_PATH}?error=invalid`, request.url));
+    return NextResponse.redirect(new URL(`${ADMIN_LOGIN_PATH}?error=invalid`, request.url), 303);
   }
 
   const redirectPath = getSafeAdminRedirectPath(parsed.data.next);
-  const response = NextResponse.redirect(new URL(redirectPath, request.url));
+  const response = NextResponse.redirect(new URL(redirectPath, request.url), 303);
 
   return createAdminSessionCookie(response, adminSession);
 }

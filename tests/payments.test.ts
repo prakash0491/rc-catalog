@@ -93,7 +93,7 @@ describe('webhooks', () => {
         event: 'payment.captured',
         payload: { payment: { entity: { id: 'rp-payment', order_id: 'rp-order', amount: 1000, currency: 'INR' } } },
       })
-    ).rejects.toThrow('STOCK_CONFLICT');
+    ).resolves.toEqual({ handled: true });
     expect(db.payment.updateMany).toHaveBeenCalledWith({
       where: { id: 'payment', status: { in: ['PENDING', 'FAILED'] } },
       data: { status: 'PAID', providerPaymentId: 'rp-payment', razorpaySignature: null },
@@ -117,6 +117,15 @@ describe('webhooks', () => {
 });
 
 describe('checkout order reuse', () => {
+  it('reuses an attempted provider order after a failed payment', async () => {
+    db.cart.findUnique.mockResolvedValue({ id: 'cart', items: [{ id: 'item', productId: 'new-product', variantId: null, quantity: 1, variant: null, product: { id: 'new-product', slug: 'new', name: 'New product', price: new Prisma.Decimal(10), isActive: true, status: 'PUBLISHED', deletedAt: null, stockQuantity: 5, images: [] } }] });
+    db.order.findFirst.mockResolvedValue({ id: 'old-order', total: new Prisma.Decimal(10), currency: 'INR', items: [{ productId: 'new-product', variantId: null, quantity: 1, price: new Prisma.Decimal(10) }], payments: [{ status: 'FAILED', providerOrderId: 'rp-old' }] });
+    gateway.fetchRazorpayOrder.mockResolvedValue({ status: 'attempted' });
+    gateway.createRazorpayOrder.mockResolvedValue({ id: 'rp-new' });
+    db.$transaction.mockResolvedValue({ id: 'new-order', orderNumber: 'RC-new', payments: [{ providerOrderId: 'rp-new' }] });
+    expect((await createCheckoutOrder('customer', { recipientName: 'Buyer', mobile: '9876543210', address: 'Sample address', pinCode: '560001', deliveryFee: 0 })).orderId).toBe('old-order');
+    expect(gateway.createRazorpayOrder).not.toHaveBeenCalled();
+  });
   it('does not reuse a same-total order with different products', async () => {
     db.cart.findUnique.mockResolvedValue({ id: 'cart', items: [{ id: 'item', productId: 'new-product', variantId: null, quantity: 1, variant: null, product: { id: 'new-product', slug: 'new', name: 'New product', price: new Prisma.Decimal(10), isActive: true, status: 'PUBLISHED', deletedAt: null, stockQuantity: 5, images: [] } }] });
     db.order.findFirst.mockResolvedValue({ id: 'old-order', total: new Prisma.Decimal(10), currency: 'INR', items: [{ productId: 'old-product', variantId: null, quantity: 1, price: new Prisma.Decimal(10) }], payments: [{ status: 'PENDING', providerOrderId: 'rp-old' }] });

@@ -236,9 +236,9 @@ function assertCartReady(raw: { items: LoadedCartItem[] }) {
   }
 }
 
-async function findReusablePendingOrder(guestSessionId: string, delivery: Delivery, raw: { total: Prisma.Decimal; items: LoadedCartItem[] }) {
+async function findReusablePendingOrder(guestSessionId: string, checkoutKey: string, raw: { total: Prisma.Decimal; items: LoadedCartItem[] }) {
   const order = await prisma.order.findFirst({
-    where: { guestSessionId, ...delivery, status: 'PENDING_PAYMENT' },
+    where: { guestSessionId, checkoutKey, status: { in: ['PENDING_PAYMENT', 'PAYMENT_FAILED'] } },
     orderBy: { createdAt: 'desc' },
     include: { items: true, payments: { orderBy: { createdAt: 'desc' }, take: 1 } },
   });
@@ -249,7 +249,7 @@ async function findReusablePendingOrder(guestSessionId: string, delivery: Delive
 
   const payment = order.payments[0];
 
-  if (!payment || payment.status !== 'PENDING' || !payment.providerOrderId || payment.providerPaymentId) {
+  if (!payment || !['PENDING', 'FAILED'].includes(payment.status) || !payment.providerOrderId || payment.providerPaymentId) {
     return null;
   }
 
@@ -268,7 +268,7 @@ async function findReusablePendingOrder(guestSessionId: string, delivery: Delive
   // Only reuse a Razorpay order that is still open.
   try {
     const razorpayOrder = await fetchRazorpayOrder(payment.providerOrderId);
-    if (razorpayOrder.status !== 'created') {
+    if (!['created', 'attempted'].includes(razorpayOrder.status)) {
       return null;
     }
   } catch {
@@ -306,7 +306,7 @@ export async function createCheckoutOrder(guestSessionId: string, delivery: Deli
 
   // Reuse an open pending order for the same cart snapshot so that
   // refreshes / re-opened checkouts do not create duplicate orders.
-  const reusable = await findReusablePendingOrder(guestSessionId, delivery, raw);
+  const reusable = await findReusablePendingOrder(guestSessionId, checkoutKey, raw);
 
   if (reusable) {
     return {
@@ -662,6 +662,7 @@ export async function handleRazorpayWebhookEvent(payload: RazorpayWebhookPayload
           providerPaymentId: paymentEntity.id,
           razorpaySignature: null,
         });
+        return { handled: true };
       }
       throw error;
     }
