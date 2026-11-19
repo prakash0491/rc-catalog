@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const p = new PrismaClient();
+import { prisma as p } from '../src/lib/prisma';
 
 (async () => {
   const [admins, customers, products, categories, orders, payments, carts, wishlist, inquiries, banners, offers, settings] =

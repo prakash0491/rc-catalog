@@ -4,7 +4,6 @@ import { CHECKOUT_CURRENCY, computeDiscountPercent, formatPrice } from '@/lib/mo
 import { ProductPurchaseOptions } from './product-purchase-options';
 import { ProductGallery } from './product-gallery';
 import { ShareButton } from './share-button';
-import { WishlistButton } from './wishlist-button';
 
 type ProductDetailsProps = {
   product: Product;
@@ -48,7 +47,7 @@ function groupVariantsByOption(variants: Product['variants']) {
   }, []);
 }
 
-export function ProductDetails({ product, whatsappNumber, initiallyWishlisted = false }: ProductDetailsProps) {
+export function ProductDetails({ product, whatsappNumber }: ProductDetailsProps) {
   const inquirySubject = encodeURIComponent(`Inquiry about ${product.name}`);
 
   const { mrp, discountPercent } = resolvePricing(product);
@@ -96,7 +95,7 @@ export function ProductDetails({ product, whatsappNumber, initiallyWishlisted = 
         <ProductPurchaseOptions productId={product.id} stockQuantity={product.stockQuantity} variants={product.variants} currency={CHECKOUT_CURRENCY} />
 
         <div className="flex flex-wrap gap-3">
-          <WishlistButton productId={product.id} initiallyWishlisted={initiallyWishlisted} variant="full" />
+
         </div>
 
         {product.specifications.length > 0 ? (

@@ -3,19 +3,33 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 
 import { buildApiError, buildApiSuccess } from '@/lib/api-utils';
-import { getCustomerSession } from '@/lib/auth/customer-session';
+import { getGuestSessionId } from '@/lib/guest-session';
 import { createCheckoutOrder } from '@/lib/orders';
 import { RazorpayConfigError } from '@/lib/razorpay';
 
-export async function POST() {
+import { z } from 'zod';
+import { deliveryFeePaise } from '@/lib/delivery';
+
+const destination = z.object({
+  recipientName: z.string().trim().min(2).max(120),
+  mobile: z.string().regex(/^[6-9][0-9]{9}$/),
+  address: z.string().trim().min(10).max(600),
+  pinCode: z.string().regex(/^[1-9][0-9]{5}$/),
+});
+
+export async function POST(request: Request) {
   try {
-    const session = await getCustomerSession();
+    const session = await getGuestSessionId();
 
     if (!session) {
       return NextResponse.json(buildApiError('Authentication required.', 'UNAUTHORIZED'), { status: 401 });
     }
 
-    const result = await createCheckoutOrder(session.id);
+    const parsed = destination.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return NextResponse.json(buildApiError('Check your delivery details.', 'INVALID_ADDRESS'), { status: 400 });
+    const fee = deliveryFeePaise(parsed.data.pinCode);
+    if (fee === null) return NextResponse.json(buildApiError('Delivery unavailable for this PIN code.', 'UNSUPPORTED_PIN'), { status: 422 });
+    const result = await createCheckoutOrder(session, { ...parsed.data, deliveryFee: fee / 100 });
 
     return NextResponse.json(buildApiSuccess(result));
   } catch (error: unknown) {

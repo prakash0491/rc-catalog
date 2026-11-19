@@ -11,10 +11,10 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('page access control', () => {
-  it.each(['/admin/login', '/admin/api/login', '/admin/api/logout', '/products'])('allows public page %s', async (path) => {
+  it.each(['/admin/login', '/admin/api/login', '/admin/api/logout', '/products', '/checkout'])('allows public page %s', async (path) => {
     expect((await middleware(new NextRequest(`http://localhost${path}`))).status).toBe(200);
   });
-  it.each(['/admin/products', '/account/orders', '/checkout'])('redirects protected page %s', async (path) => {
+  it.each(['/admin/products', '/account/orders'])('redirects protected page %s', async (path) => {
     const response = await middleware(new NextRequest(`http://localhost${path}?test=1`));
     expect(response.status).toBe(307);
     const target = new URL(response.headers.get('location')!);

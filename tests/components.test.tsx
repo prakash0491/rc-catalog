@@ -60,7 +60,7 @@ describe('add to cart feedback', () => {
 });
 describe('checkout display', () => {
   it('shows the precise charge and respects unavailable items', () => {
-    render(<CheckoutButton total={19.99} currency="INR" customerName="Test" customerEmail="test@example.com" businessName="RC" disabled />);
+    render(<CheckoutButton total={19.99} currency="INR" businessName="RC" disabled />);
     expect(screen.getByRole('button', { name: 'Pay ₹19.99' })).toBeDisabled();
   });
 });

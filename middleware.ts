@@ -8,6 +8,16 @@ const PUBLIC_ADMIN_PATHS = [ADMIN_LOGIN_PATH, '/admin/api/login', '/admin/api/lo
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (/^\/api\/(auth|wishlist|orders)(?:\/|$)/.test(pathname)) {
+    return new NextResponse(null, { status: 410 });
+  }
+  if (pathname.startsWith('/api/cart')) {
+    const headers = new Headers(request.headers);
+    request.cookies.delete(CUSTOMER_AUTH_COOKIE);
+    headers.set('cookie', request.cookies.toString());
+    return NextResponse.next({ request: { headers } });
+  }
+
   // ── Admin route protection ──
   if (pathname.startsWith('/admin')) {
     if (PUBLIC_ADMIN_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
@@ -30,7 +40,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Customer account / checkout route protection ──
-  if (pathname.startsWith('/account') || pathname === '/checkout') {
+  if (pathname.startsWith('/account')) {
     const token = request.cookies.get(CUSTOMER_AUTH_COOKIE)?.value;
     const session = token ? await verifyCustomerSession(token) : null;
 
@@ -50,5 +60,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/account/:path*', '/checkout'],
+  matcher: ['/admin/:path*', '/account/:path*', '/api/auth/:path*', '/api/wishlist/:path*', '/api/orders/:path*', '/api/cart/:path*'],
 };

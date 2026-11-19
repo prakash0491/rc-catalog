@@ -20,6 +20,9 @@ function getRazorpayCredentials() {
     throw new RazorpayConfigError('Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.');
   }
 
+  if (!keyId.startsWith('rzp_test_')) {
+    throw new RazorpayConfigError('Checkout requires Razorpay test mode.');
+  }
   return { keyId, keySecret };
 }
 

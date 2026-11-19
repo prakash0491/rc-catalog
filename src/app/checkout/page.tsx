@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { ResponsiveContainer, SectionContainer } from '@/components/common';
 import { CheckoutButton } from '@/components/checkout/checkout-button';
 import { BaseCard, EmptyState, Heading, PrimaryButton, Text } from '@/components/ui';
-import { getCustomerSession } from '@/lib/auth/customer-session';
+import { getGuestSessionId } from '@/lib/guest-session';
 import { formatPrice } from '@/lib/money';
 import { loadCheckoutCart } from '@/lib/orders';
 import { getPublicContent } from '@/lib/public-content';
@@ -13,13 +13,13 @@ import { getPublicContent } from '@/lib/public-content';
 export const dynamic = 'force-dynamic';
 
 export default async function CheckoutPage() {
-  const session = await getCustomerSession();
+  const session = await getGuestSessionId();
 
   if (!session) {
-    redirect('/login?next=/checkout');
+    redirect('/cart');
   }
 
-  const [cart, publicContent] = await Promise.all([loadCheckoutCart(session.id), getPublicContent()]);
+  const [cart, publicContent] = await Promise.all([loadCheckoutCart(session), getPublicContent()]);
 
   if (!cart || cart.items.length === 0) {
     return (
@@ -97,16 +97,7 @@ export default async function CheckoutPage() {
               </BaseCard>
             ))}
 
-            <BaseCard className="space-y-3">
-              <Heading as="h2" size="h4">Customer</Heading>
-              <div className="space-y-1">
-                <Text variant="small" className="font-medium text-slate-900">{session.name}</Text>
-                <Text variant="muted">{session.email}</Text>
-              </div>
-              <Text variant="caption" className="text-slate-400">
-                Shipping details will be collected in a future phase.
-              </Text>
-            </BaseCard>
+
           </div>
 
           {/* Order summary */}
@@ -118,23 +109,12 @@ export default async function CheckoutPage() {
                   <span>Subtotal</span>
                   <span className="font-semibold text-slate-900">{formatPrice(cart.subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-sm text-slate-500">
-                  <span>Shipping</span>
-                  <span>Calculated later</span>
-                </div>
               </div>
-              <div className="border-t border-slate-100 pt-4">
-                <div className="flex justify-between">
-                  <span className="font-bold text-slate-900">Total</span>
-                  <span className="text-xl font-bold text-slate-900">{formatPrice(cart.total)}</span>
-                </div>
-              </div>
-
               <CheckoutButton
                 total={cart.total}
                 currency={cart.currency}
-                customerName={session.name}
-                customerEmail={session.email}
+
+
                 businessName={publicContent.businessProfile.name}
                 disabled={hasUnavailableItems}
               />

@@ -15,7 +15,6 @@ import {
 import type { ProductSortOption, PublicProductListItem } from '@/lib/products';
 import { formatPrice } from '@/lib/money';
 
-import { WishlistButton } from '@/components/product/wishlist-button';
 
 import { DiscoverySearch } from './discovery-search';
 
@@ -239,7 +238,7 @@ export function ProductCatalog({
                       </span>
                     ) : null}
                   </div>
-                  <WishlistButton productId={product.id} className="absolute right-14 top-4 h-8 w-8 bg-white/95" />
+
                   <span className="absolute right-4 top-4 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-slate-600 shadow-sm">
                     {formatStockStatus(product.stockStatus)}
                   </span>

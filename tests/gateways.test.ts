@@ -9,7 +9,7 @@ beforeEach(() => {
   vi.stubEnv('CLOUDINARY_CLOUD_NAME', 'test');
   vi.stubEnv('CLOUDINARY_API_KEY', 'test');
   vi.stubEnv('CLOUDINARY_API_SECRET', 'test');
-  vi.stubEnv('RAZORPAY_KEY_ID', 'rzp_test');
+  vi.stubEnv('RAZORPAY_KEY_ID', 'rzp_test_example');
   vi.stubEnv('RAZORPAY_KEY_SECRET', 'payment-secret');
   vi.stubEnv('RAZORPAY_WEBHOOK_SECRET', 'webhook-secret');
 });

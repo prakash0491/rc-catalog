@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { buildApiError, buildApiSuccess } from '@/lib/api-utils';
-import { getCustomerSession } from '@/lib/auth/customer-session';
+import { getGuestSessionId } from '@/lib/guest-session';
 import { verifyCheckoutPayment } from '@/lib/orders';
 import { RazorpayConfigError } from '@/lib/razorpay';
 
@@ -16,7 +16,7 @@ const verifySchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const session = await getCustomerSession();
+    const session = await getGuestSessionId();
 
     if (!session) {
       return NextResponse.json(buildApiError('Authentication required.', 'UNAUTHORIZED'), { status: 401 });
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     }
 
     const result = await verifyCheckoutPayment({
-      customerId: session.id,
+      customerId: session,
       razorpayOrderId: parsed.data.razorpayOrderId,
       razorpayPaymentId: parsed.data.razorpayPaymentId,
       razorpaySignature: parsed.data.razorpaySignature,

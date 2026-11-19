@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { ADMIN_HOME_PATH, ADMIN_LOGIN_PATH, getAdminSessionFromCookieStore } from '@/lib/auth/server';
 
 const navigationItems = [
+  { href: '/admin/orders', label: 'Orders' },
   { href: ADMIN_HOME_PATH, label: 'Overview' },
   { href: '/admin/products', label: 'Products' },
   { href: '/admin/categories', label: 'Categories' },

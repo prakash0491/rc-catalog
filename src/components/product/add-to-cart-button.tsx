@@ -20,7 +20,7 @@ export function AddToCartButton({ productId, variantId = null, className }: AddT
   const [added, setAdded] = useState(false);
   const [error, setError] = useState('');
 
-  async function handleAdd() {
+  async function handleAdd(buyNow = false) {
     setError('');
     setLoading(true);
 
@@ -34,9 +34,8 @@ export function AddToCartButton({ productId, variantId = null, className }: AddT
       if (res.ok) {
         setAdded(true);
         window.setTimeout(() => setAdded(false), 2000);
-        router.refresh();
-      } else if (res.status === 401) {
-        router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+        if (buyNow) router.push('/checkout');
+        else router.refresh();
       } else {
         const payload = await res.json().catch(() => null);
         setError(payload?.error?.message ?? 'Unable to add this item to your cart.');
@@ -72,7 +71,7 @@ export function AddToCartButton({ productId, variantId = null, className }: AddT
         </button>
       </div>
 
-      <PrimaryButton type="button" onClick={handleAdd} loading={loading} className={cn('gap-2', added ? 'bg-emerald-600 hover:bg-emerald-700' : '')}>
+      <PrimaryButton type="button" onClick={() => handleAdd()} loading={loading} className={cn('gap-2', added ? 'bg-emerald-600 hover:bg-emerald-700' : '')}>
         {added ? (
           <>
             <Check className="h-4 w-4" />
@@ -85,6 +84,7 @@ export function AddToCartButton({ productId, variantId = null, className }: AddT
           </>
         )}
       </PrimaryButton>
+      <button type="button" disabled={loading} onClick={() => handleAdd(true)}>Buy now</button>
       {error ? <p role="alert" className="w-full text-sm text-rose-700">{error}</p> : null}
     </div>
   );

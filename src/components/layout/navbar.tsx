@@ -1,14 +1,11 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
-import { Heart, ShoppingCart, User } from 'lucide-react';
 
 import { HeaderSearch } from '@/components/products/header-search';
-import { Container, IconButton, Stack } from '@/components/ui';
-import { CUSTOMER_AUTH_COOKIE, GUEST_CART_COOKIE } from '@/lib/auth/customer-constants';
-import { verifyCustomerSession } from '@/lib/auth/customer-jwt';
+import { Container, Stack } from '@/components/ui';
+import { GUEST_CART_COOKIE } from '@/lib/auth/customer-constants';
 import { getCartItemCount } from '@/lib/cart';
 import { getPublicContent } from '@/lib/public-content';
-import { getWishlistCount } from '@/lib/wishlist';
 
 const navItems = [
   { label: 'Shop', href: '/products' },
@@ -22,16 +19,8 @@ export async function Navbar() {
   const { businessProfile } = await getPublicContent();
 
   const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(CUSTOMER_AUTH_COOKIE)?.value;
-  const customer = sessionToken ? await verifyCustomerSession(sessionToken) : null;
-
   const guestSessionId = cookieStore.get(GUEST_CART_COOKIE)?.value ?? null;
-
-  const [cartCount, wishlistCount] = await Promise.all([
-    getCartItemCount(customer, guestSessionId),
-    customer ? getWishlistCount(customer.id) : Promise.resolve(0),
-  ]);
-
+  const cartCount = await getCartItemCount(null, guestSessionId);
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl">
       <div className="hidden bg-slate-950 text-white md:block">
@@ -78,43 +67,7 @@ export async function Navbar() {
             S
           </Link>
 
-          {customer ? (
-            <>
-              <Link href="/wishlist" className="relative">
-                <IconButton icon={<Heart className="h-4 w-4" />} label="Wishlist" />
-                {wishlistCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 grid h-5 min-w-[20px] place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
-                    {wishlistCount}
-                  </span>
-                ) : null}
-              </Link>
-              <Link href="/cart" className="relative">
-                <IconButton icon={<ShoppingCart className="h-4 w-4" />} label="Cart" />
-                {cartCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 grid h-5 min-w-[20px] place-items-center rounded-full bg-slate-950 px-1 text-[10px] font-bold text-white">
-                    {cartCount}
-                  </span>
-                ) : null}
-              </Link>
-              <Link href="/account" className="relative">
-                <IconButton icon={<User className="h-4 w-4" />} label="Account" />
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/cart" className="relative">
-                <IconButton icon={<ShoppingCart className="h-4 w-4" />} label="Cart" />
-                {cartCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 grid h-5 min-w-[20px] place-items-center rounded-full bg-slate-950 px-1 text-[10px] font-bold text-white">
-                    {cartCount}
-                  </span>
-                ) : null}
-              </Link>
-              <Link href="/login" className="text-sm font-semibold text-slate-600 transition hover:text-slate-950">
-                Sign in
-              </Link>
-            </>
-          )}
+          <Link href="/cart" aria-label="Shopping cart">Cart ({cartCount})</Link>
 
           <Link href="/contact" className="hidden rounded-full bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 sm:inline-flex">
             Inquire

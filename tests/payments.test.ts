@@ -18,7 +18,7 @@ import { createCheckoutOrder, finalizePaidOrder, handleRazorpayWebhookEvent, ver
 const params = { customerId: 'customer', razorpayOrderId: 'rp-order', razorpayPaymentId: 'rp-payment', razorpaySignature: 'signature' };
 beforeEach(() => {
   vi.resetAllMocks();
-  db.payment.findUnique.mockResolvedValue({ id: 'payment', orderId: 'order', status: 'PENDING', order: { customerId: 'customer', total: new Prisma.Decimal(10), currency: 'INR' } });
+  db.payment.findUnique.mockResolvedValue({ id: 'payment', orderId: 'order', status: 'PENDING', order: { guestSessionId: 'customer', customerId: null, total: new Prisma.Decimal(10), currency: 'INR' } });
   gateway.verifyRazorpayPaymentSignature.mockReturnValue(true);
   gateway.fetchRazorpayPayment.mockResolvedValue({ id: 'rp-payment', order_id: 'rp-order', amount: 1000, currency: 'INR', status: 'captured' });
   db.$transaction.mockResolvedValue({ alreadyProcessed: false });
@@ -32,9 +32,7 @@ describe('payment verification', () => {
   it('rejects invalid signatures', async () => {
     gateway.verifyRazorpayPaymentSignature.mockReturnValue(false);
     await expect(verifyCheckoutPayment(params)).rejects.toThrow('VERIFICATION_FAILED');
-    expect(db.payment.updateMany).toHaveBeenCalledWith({ where: { id: 'payment', status: { in: ['PENDING', 'FAILED'] } }, data: { status: 'FAILED' } });
-    expect(db.order.updateMany).toHaveBeenCalledWith({ where: { id: 'order', status: 'PENDING_PAYMENT' }, data: { status: 'PAYMENT_FAILED' } });
-    expect(db.$transaction).toHaveBeenCalledWith(expect.arrayContaining([expect.anything(), expect.anything()]));
+    expect(db.$transaction).not.toHaveBeenCalled();
   });
   it.each(['authorized', 'failed', 'refunded', 'created'])('does not finalize %s payments', async (status) => {
     gateway.fetchRazorpayPayment.mockResolvedValue({ order_id: 'rp-order', amount: 1000, currency: 'INR', status });
@@ -125,7 +123,7 @@ describe('checkout order reuse', () => {
     gateway.fetchRazorpayOrder.mockResolvedValue({ status: 'created' });
     gateway.createRazorpayOrder.mockResolvedValue({ id: 'rp-new' });
     db.$transaction.mockResolvedValue({ id: 'new-order', orderNumber: 'RC-new', payments: [{ providerOrderId: 'rp-new' }] });
-    expect((await createCheckoutOrder('customer')).orderId).toBe('new-order');
+    expect((await createCheckoutOrder('customer', { recipientName: 'Buyer', mobile: '9876543210', address: 'Sample address', pinCode: '560001', deliveryFee: 0 })).orderId).toBe('new-order');
     expect(gateway.createRazorpayOrder).toHaveBeenCalledOnce();
   });
 });

@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
@@ -75,14 +76,14 @@ type LoadedCartItem = {
 
 // ─── Server-side cart loading & validation ──────────────────
 
-async function loadCheckoutCartRaw(customerId: string): Promise<{
+async function loadCheckoutCartRaw(guestSessionId: string): Promise<{
   cartId: string;
   items: LoadedCartItem[];
   subtotal: Prisma.Decimal;
   total: Prisma.Decimal;
 } | null> {
   const cart = await prisma.cart.findUnique({
-    where: { customerId },
+    where: { guestSessionId },
     include: {
       items: {
         include: {
@@ -235,9 +236,9 @@ function assertCartReady(raw: { items: LoadedCartItem[] }) {
   }
 }
 
-async function findReusablePendingOrder(customerId: string, raw: { total: Prisma.Decimal; items: LoadedCartItem[] }) {
+async function findReusablePendingOrder(guestSessionId: string, delivery: Delivery, raw: { total: Prisma.Decimal; items: LoadedCartItem[] }) {
   const order = await prisma.order.findFirst({
-    where: { customerId, status: 'PENDING_PAYMENT' },
+    where: { guestSessionId, ...delivery, status: 'PENDING_PAYMENT' },
     orderBy: { createdAt: 'desc' },
     include: { items: true, payments: { orderBy: { createdAt: 'desc' }, take: 1 } },
   });
@@ -286,20 +287,26 @@ export type CreateCheckoutOrderResult = {
   currency: string;
 };
 
-export async function createCheckoutOrder(customerId: string): Promise<CreateCheckoutOrderResult> {
-  const raw = await loadCheckoutCartRaw(customerId);
+type Delivery = { recipientName: string; mobile: string; address: string; pinCode: string; deliveryFee: number };
+
+export async function createCheckoutOrder(guestSessionId: string, delivery: Delivery): Promise<CreateCheckoutOrderResult> {
+  const raw = await loadCheckoutCartRaw(guestSessionId);
 
   if (!raw) {
     throw new Error('CART_EMPTY');
   }
 
   assertCartReady(raw);
+  raw.total = raw.subtotal.add(delivery.deliveryFee);
 
+  // A unique snapshot key lets only one concurrent attempt return a payable order.
+  const lines = raw.items.map(item => [item.id, item.quantity, item.unitPrice.toString()]).sort();
+  const checkoutKey = createHash('sha256').update(JSON.stringify([guestSessionId, delivery, lines])).digest('hex');
   const orderNumber = generateOrderNumber();
 
   // Reuse an open pending order for the same cart snapshot so that
   // refreshes / re-opened checkouts do not create duplicate orders.
-  const reusable = await findReusablePendingOrder(customerId, raw);
+  const reusable = await findReusablePendingOrder(guestSessionId, delivery, raw);
 
   if (reusable) {
     return {
@@ -312,12 +319,6 @@ export async function createCheckoutOrder(customerId: string): Promise<CreateChe
     };
   }
 
-  // Close any other pending orders for this customer before creating a new attempt.
-  await prisma.order.updateMany({
-    where: { customerId, status: 'PENDING_PAYMENT' },
-    data: { status: 'CANCELLED' },
-  });
-
   const razorpayOrder = await createRazorpayOrder({
     receipt: orderNumber,
     amount: Number(raw.total),
@@ -327,7 +328,9 @@ export async function createCheckoutOrder(customerId: string): Promise<CreateChe
     const created = await tx.order.create({
       data: {
         orderNumber,
-        customerId,
+        checkoutKey,
+        guestSessionId,
+        ...delivery,
         status: 'PENDING_PAYMENT',
         subtotal: raw.subtotal,
         total: raw.total,
@@ -423,7 +426,8 @@ async function markCapturedPaymentForRefund(params: {
 export async function finalizePaidOrder(params: {
   paymentId: string;
   orderId: string;
-  customerId: string;
+  guestSessionId?: string | null;
+  customerId: string | null;
   providerPaymentId: string;
   razorpaySignature: string | null;
 }) {
@@ -471,7 +475,8 @@ export async function finalizePaidOrder(params: {
     }
 
     // Clear purchased items from the customer's cart. The cart row itself is kept.
-    const cart = await tx.cart.findUnique({ where: { customerId } });
+    const owner = customerId ? { customerId } : params.guestSessionId ? { guestSessionId: params.guestSessionId } : null;
+    const cart = owner ? await tx.cart.findUnique({ where: owner }) : null;
 
     if (cart) {
       // A delayed webhook must not erase items added after checkout started.
@@ -504,11 +509,12 @@ export async function verifyCheckoutPayment(params: {
     include: { order: true },
   });
 
-  if (!payment || payment.order.customerId !== customerId) {
+  if (!payment || payment.order.guestSessionId !== customerId) {
     throw new Error('ORDER_NOT_FOUND');
   }
 
   if (payment.status === 'PAID') {
+    if (payment.order.status === 'REFUND_REQUIRED') throw new Error('STOCK_CONFLICT');
     // Idempotent: the payment is already finalized.
     return { orderId: payment.orderId, alreadyProcessed: true };
   }
@@ -520,7 +526,6 @@ export async function verifyCheckoutPayment(params: {
       razorpaySignature,
     })
   ) {
-    await markPaymentFailed(payment.id, payment.orderId);
     throw new Error('VERIFICATION_FAILED');
   }
 
@@ -555,6 +560,7 @@ export async function verifyCheckoutPayment(params: {
       paymentId: payment.id,
       orderId: payment.orderId,
       customerId: payment.order.customerId,
+      guestSessionId: payment.order.guestSessionId,
       providerPaymentId: razorpayPaymentId,
       razorpaySignature,
     });
@@ -610,7 +616,7 @@ export async function handleRazorpayWebhookEvent(payload: RazorpayWebhookPayload
 
   // payment.captured → finalize the order (idempotent).
   if (event === 'payment.captured') {
-    if (!paymentEntity.id || paymentEntity.currency !== payment.order.currency) {
+    if (!paymentEntity.id || !paymentEntity.currency) {
       return { handled: false };
     }
     if (payment.status === 'PAID') {
@@ -643,6 +649,7 @@ export async function handleRazorpayWebhookEvent(payload: RazorpayWebhookPayload
         paymentId: payment.id,
         orderId: payment.orderId,
         customerId: payment.order.customerId,
+      guestSessionId: payment.order.guestSessionId,
         providerPaymentId: paymentEntity.id,
         razorpaySignature: null,
       });
