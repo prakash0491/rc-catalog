@@ -1,6 +1,6 @@
-import { deliveryFeePaise } from '@/lib/delivery';
+import { configuredDeliveryFee } from '@/lib/configured-delivery';
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const pin = new URL(request.url).searchParams.get('pin') ?? '';
-  return Response.json({ fee: deliveryFeePaise(pin) }, { headers: { 'Cache-Control': 'no-store' } });
+  return Response.json({ fee: await configuredDeliveryFee(pin) }, { headers: { 'Cache-Control': 'no-store' } });
 }

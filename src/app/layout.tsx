@@ -6,7 +6,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { StorefrontShell } from "@/components/layout/storefront-shell";
 
 export const metadata: Metadata = {
-  title: "RC Catalog",
+  title: "VISH GARAGE",
   description: "A production product catalog for curated commerce.",
 };
 

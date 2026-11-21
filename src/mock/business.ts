@@ -36,7 +36,7 @@ export interface BusinessProfile {
 
 export const businessProfile: BusinessProfile = {
   id: 'business-profile',
-  name: 'Northstar Commerce',
+  name: 'VISH GARAGE',
   tagline: 'Curated products for modern living',
   description:
     'A flexible commerce platform designed to showcase products with clarity, trust, and modern presentation.',
@@ -53,7 +53,7 @@ export const businessProfile: BusinessProfile = {
   mission: 'To create a calm, premium shopping experience that helps customers discover products with confidence and clarity.',
   vision: 'To become the most trusted local destination for carefully curated products and thoughtful customer support.',
   story:
-    'Northstar Commerce began as a simple idea: bring refined product storytelling, beautiful presentation, and dependable service together in one place. Over time, the platform evolved into a flexible storefront experience that balances elegance with clarity.',
+    'VISH GARAGE began as a simple idea: bring refined product storytelling, beautiful presentation, and dependable service together in one place. Over time, the platform evolved into a flexible storefront experience that balances elegance with clarity.',
   whyChooseUs: [
     {
       title: 'Editorial quality',

@@ -406,6 +406,17 @@ export async function getPublicCategoryBySlug(slug: string) {
   });
 }
 
+function productSearchConditions(query: string): Prisma.ProductWhereInput[] {
+  const match = { contains: query, mode: 'insensitive' } as const;
+  return [
+    { name: match },
+    { shortDescription: match },
+    { description: match },
+    { category: { name: match } },
+    { specifications: { some: { name: { equals: 'brand', mode: 'insensitive' }, value: match } } },
+  ];
+}
+
 export async function listPublicProducts(params: PublicProductListParams) {
   const where: Prisma.ProductWhereInput = {
     isActive: true,
@@ -422,11 +433,7 @@ export async function listPublicProducts(params: PublicProductListParams) {
   }
 
   if (params.search) {
-    where.OR = [
-      { name: { contains: params.search, mode: 'insensitive' } },
-      { shortDescription: { contains: params.search, mode: 'insensitive' } },
-      { description: { contains: params.search, mode: 'insensitive' } },
-    ];
+    where.OR = productSearchConditions(params.search);
   }
 
   if (typeof params.minPrice === 'number') {
@@ -595,11 +602,7 @@ export async function getProductSearchSuggestions(query: string, limit = 5) {
         status: ProductStatus.PUBLISHED,
         deletedAt: null,
         category: { isActive: true },
-        OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { shortDescription: { contains: query, mode: 'insensitive' } },
-          { description: { contains: query, mode: 'insensitive' } },
-        ],
+        OR: productSearchConditions(query),
       },
       take: limit,
       orderBy: [{ featured: 'desc' }, { createdAt: 'desc' }],

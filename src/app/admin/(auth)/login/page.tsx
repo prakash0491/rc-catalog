@@ -101,6 +101,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
                     Sign in
                   </button>
                 </form>
+                <Link href="/admin/recover">Forgot password?</Link>
 
                 <p className="mt-5 text-xs leading-5 text-slate-500">
                   Protected areas include products, categories, banners, and offers.{' '}

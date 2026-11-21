@@ -11,6 +11,7 @@ const optionalSafeLink = z
   .refine((value) => !value || isSafeWebLink(value), 'Enter a valid http(s) URL or internal path.');
 
 export const businessSettingsSchema = z.object({
+  deliveryRates: z.string().trim().max(100000).refine(text => !text || text.split(/\r?\n/).every(line => /^[1-9]\d{5}\s+\d{1,5}(?:\.\d{1,2})?$/.test(line.trim())), 'Use one PIN and rupee fee per line, for example 560001 49.').optional(),
   businessName: z.string().trim().min(2, 'Business name is required.'),
   logo: optionalSafeLink,
   phone: z.string().trim().optional().default(''),
@@ -33,6 +34,7 @@ function emptyToNull(value: string) {
 
 export function parseBusinessSettingsForm(formData: FormData): BusinessSettingsInput {
   return businessSettingsSchema.parse({
+    deliveryRates: formData.has('deliveryRates') ? String(formData.get('deliveryRates')) : undefined,
     businessName: String(formData.get('businessName') ?? ''),
     logo: String(formData.get('logo') ?? ''),
     phone: String(formData.get('phone') ?? ''),
@@ -57,6 +59,7 @@ export async function getBusinessSettingsForEdit() {
 export async function upsertBusinessSettings(input: BusinessSettingsInput) {
   const existing = await getBusinessSettingsForEdit();
   const data = {
+    deliveryRates: input.deliveryRates,
     businessName: input.businessName,
     logo: emptyToNull(input.logo),
     phone: emptyToNull(input.phone),

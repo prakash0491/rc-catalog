@@ -117,22 +117,56 @@ describe('webhooks', () => {
 });
 
 describe('checkout order reuse', () => {
+  const delivery = { recipientName: 'Buyer', mobile: '9876543210', address: 'Sample address', pinCode: '560001', deliveryFee: 0 };
+  const cartLine = {
+    id: 'item', productId: 'new-product', variantId: null, quantity: 1, variant: null,
+    product: {
+      id: 'new-product', slug: 'new', name: 'New product', price: new Prisma.Decimal(10),
+      isActive: true, status: 'PUBLISHED', deletedAt: null, stockQuantity: 5, images: [], category: { isActive: true },
+    },
+  };
+
+  beforeEach(() => db.cart.findUnique.mockResolvedValue({ id: 'cart', items: [cartLine] }));
+
+  it('rejects a cart item after its category is deactivated', async () => {
+    db.cart.findUnique.mockResolvedValue({ id: 'cart', items: [{
+      ...cartLine, product: { ...cartLine.product, category: { isActive: false } },
+    }] });
+    await expect(createCheckoutOrder('customer', delivery)).rejects.toThrow('ITEM_UNAVAILABLE');
+    expect(gateway.createRazorpayOrder).not.toHaveBeenCalled();
+  });
+
+  it('returns the saved payable order when a concurrent checkout wins', async () => {
+    db.order.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: 'winner', orderNumber: 'RC-winner', total: new Prisma.Decimal(10), currency: 'INR',
+      items: [{ productId: 'new-product', variantId: null, quantity: 1, price: new Prisma.Decimal(10) }],
+      payments: [{ status: 'PENDING', providerOrderId: 'rp-winner' }],
+    });
+    gateway.fetchRazorpayOrder.mockResolvedValue({ status: 'created' });
+    gateway.createRazorpayOrder.mockResolvedValue({ id: 'rp-loser' });
+    db.$transaction.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError('Unique checkout key', {
+      code: 'P2002', clientVersion: 'test',
+    }));
+
+    await expect(createCheckoutOrder('customer', delivery)).resolves.toMatchObject({
+      orderId: 'winner', razorpayOrderId: 'rp-winner', amount: 1000,
+    });
+  });
+
   it('reuses an attempted provider order after a failed payment', async () => {
-    db.cart.findUnique.mockResolvedValue({ id: 'cart', items: [{ id: 'item', productId: 'new-product', variantId: null, quantity: 1, variant: null, product: { id: 'new-product', slug: 'new', name: 'New product', price: new Prisma.Decimal(10), isActive: true, status: 'PUBLISHED', deletedAt: null, stockQuantity: 5, images: [] } }] });
     db.order.findFirst.mockResolvedValue({ id: 'old-order', total: new Prisma.Decimal(10), currency: 'INR', items: [{ productId: 'new-product', variantId: null, quantity: 1, price: new Prisma.Decimal(10) }], payments: [{ status: 'FAILED', providerOrderId: 'rp-old' }] });
     gateway.fetchRazorpayOrder.mockResolvedValue({ status: 'attempted' });
     gateway.createRazorpayOrder.mockResolvedValue({ id: 'rp-new' });
     db.$transaction.mockResolvedValue({ id: 'new-order', orderNumber: 'RC-new', payments: [{ providerOrderId: 'rp-new' }] });
-    expect((await createCheckoutOrder('customer', { recipientName: 'Buyer', mobile: '9876543210', address: 'Sample address', pinCode: '560001', deliveryFee: 0 })).orderId).toBe('old-order');
+    expect((await createCheckoutOrder('customer', delivery)).orderId).toBe('old-order');
     expect(gateway.createRazorpayOrder).not.toHaveBeenCalled();
   });
   it('does not reuse a same-total order with different products', async () => {
-    db.cart.findUnique.mockResolvedValue({ id: 'cart', items: [{ id: 'item', productId: 'new-product', variantId: null, quantity: 1, variant: null, product: { id: 'new-product', slug: 'new', name: 'New product', price: new Prisma.Decimal(10), isActive: true, status: 'PUBLISHED', deletedAt: null, stockQuantity: 5, images: [] } }] });
     db.order.findFirst.mockResolvedValue({ id: 'old-order', total: new Prisma.Decimal(10), currency: 'INR', items: [{ productId: 'old-product', variantId: null, quantity: 1, price: new Prisma.Decimal(10) }], payments: [{ status: 'PENDING', providerOrderId: 'rp-old' }] });
     gateway.fetchRazorpayOrder.mockResolvedValue({ status: 'created' });
     gateway.createRazorpayOrder.mockResolvedValue({ id: 'rp-new' });
     db.$transaction.mockResolvedValue({ id: 'new-order', orderNumber: 'RC-new', payments: [{ providerOrderId: 'rp-new' }] });
-    expect((await createCheckoutOrder('customer', { recipientName: 'Buyer', mobile: '9876543210', address: 'Sample address', pinCode: '560001', deliveryFee: 0 })).orderId).toBe('new-order');
+    expect((await createCheckoutOrder('customer', delivery)).orderId).toBe('new-order');
     expect(gateway.createRazorpayOrder).toHaveBeenCalledOnce();
   });
 });
@@ -143,7 +177,10 @@ describe('transactional payment finalization', () => {
       payment: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       order: { update: vi.fn() },
       orderItem: { findMany: vi.fn().mockResolvedValue([{ productId: 'p', variantId: null, quantity: 2 }]) },
-      product: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      product: {
+        updateManyAndReturn: vi.fn().mockResolvedValue([{ stockQuantity: 5, lowStockThreshold: 2, stockStatus: 'IN_STOCK' }]),
+        update: vi.fn(),
+      },
       productVariant: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       cart: { findUnique: vi.fn().mockResolvedValue({ id: 'cart' }) },
       cartItem: { deleteMany: vi.fn(), updateMany: vi.fn() },
@@ -155,17 +192,24 @@ describe('transactional payment finalization', () => {
   it('atomically decrements inventory with a nonnegative guard', async () => {
     const tx = transaction();
     await finalizePaidOrder(finalization);
-    expect(tx.product.updateMany).toHaveBeenCalledWith({ where: { id: 'p', stockQuantity: { gte: 2 } }, data: { stockQuantity: { decrement: 2 } } });
+    expect(tx.product.updateManyAndReturn).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'p', stockQuantity: { gte: 2 } }, data: { stockQuantity: { decrement: 2 } } }));
+    expect(tx.product.update).not.toHaveBeenCalled();
+  });
+  it.each([[2, 'LOW_STOCK'], [0, 'OUT_OF_STOCK']])('updates the catalog stock status when %i units remain', async (stockQuantity, stockStatus) => {
+    const tx = transaction();
+    tx.product.updateManyAndReturn.mockResolvedValue([{ stockQuantity, lowStockThreshold: 2, stockStatus: 'IN_STOCK' }]);
+    await finalizePaidOrder(finalization);
+    expect(tx.product.update).toHaveBeenCalledWith({ where: { id: 'p' }, data: { stockStatus } });
   });
   it('does not decrement inventory twice', async () => {
     const tx = transaction();
     tx.payment.updateMany.mockResolvedValue({ count: 0 });
     expect(await finalizePaidOrder(finalization)).toEqual({ alreadyProcessed: true });
-    expect(tx.product.updateMany).not.toHaveBeenCalled();
+    expect(tx.product.updateManyAndReturn).not.toHaveBeenCalled();
   });
   it('fails the transaction on insufficient inventory', async () => {
     const tx = transaction();
-    tx.product.updateMany.mockResolvedValue({ count: 0 });
+    tx.product.updateManyAndReturn.mockResolvedValue([]);
     await expect(finalizePaidOrder(finalization)).rejects.toThrow('STOCK_CONFLICT');
     expect(tx.cartItem.deleteMany).not.toHaveBeenCalled();
   });

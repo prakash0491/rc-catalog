@@ -120,7 +120,7 @@ export const getPublicContent = cache(async (): Promise<PublicContentResponse> =
     const settings = businessSettings;
     const businessProfile = {
       id: settings?.id ?? 'business-profile',
-      name: settings?.businessName ?? 'Northstar Commerce',
+      name: settings?.businessName ?? 'VISH GARAGE',
       tagline: 'Curated products for modern living',
       description: settings?.seoDescription ?? 'A flexible commerce platform designed to showcase products with clarity, trust, and modern presentation.',
       email: settings?.email ?? 'hello@northstarcommerce.com',
@@ -135,7 +135,7 @@ export const getPublicContent = cache(async (): Promise<PublicContentResponse> =
       ],
       mission: 'To create a calm, premium shopping experience that helps customers discover products with confidence and clarity.',
       vision: 'To become the most trusted local destination for carefully curated products and thoughtful customer support.',
-      story: 'Northstar Commerce brings curated products, clear storytelling, and dependable service together in one refined experience.',
+      story: 'VISH GARAGE brings curated products, clear storytelling, and dependable service together in one refined experience.',
       whyChooseUs: [
         { title: 'Editorial quality', description: 'Every product page is shaped around clarity, trust, and thoughtful details.' },
         { title: 'Thoughtful support', description: 'Customers can connect instantly through WhatsApp and email.' },

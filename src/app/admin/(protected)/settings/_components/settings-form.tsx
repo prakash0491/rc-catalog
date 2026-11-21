@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Alert, Input, Textarea } from '@/components/ui';
 
 type SettingsFormValues = {
+  deliveryRates: string;
   businessName: string;
   logo: string;
   phone: string;
@@ -53,6 +54,9 @@ export function SettingsForm({ initialValues }: { initialValues: SettingsFormVal
     <form onSubmit={handleSubmit} className="space-y-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
       {message ? <Alert tone={message === 'Settings saved.' ? 'success' : 'error'}>{message}</Alert> : null}
 
+      <label className="block">Delivery PIN codes and charges in rupees (one per line, e.g. 560001 49)
+        <Textarea name="deliveryRates" defaultValue={initialValues.deliveryRates} />
+      </label>
       <div className="grid gap-5 md:grid-cols-2">
         <label className="space-y-2 md:col-span-2">
           <span className="text-sm font-medium text-slate-700">Business name</span>

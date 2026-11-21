@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock } from 'lucide-react';
 
 import { Alert, PrimaryButton, Text } from '@/components/ui';
-import { formatPrice } from '@/lib/money';
+import { formatPrice, toRazorpayAmount } from '@/lib/money';
 
 type RazorpayCheckoutOptions = {
   key: string;
@@ -61,8 +61,37 @@ export function CheckoutButton({
 
   const [details, setDetails] = useState({ recipientName: '', address: '', mobile: '', pinCode: '' });
   const [quote, setQuote] = useState<{ pin: string; fee: number } | null>(null);
+  const quoteRequest = useRef(0);
   const fee = quote?.pin === details.pinCode ? quote.fee : null;
+
+  async function checkDelivery(pin = details.pinCode) {
+    const request = ++quoteRequest.current;
+    if (!/^[1-9][0-9]{5}$/.test(pin)) { setError('Enter a six-digit delivery PIN code.'); return; }
+
+    setQuote(null);
+    setError('');
+    try {
+      const response = await fetch('/api/checkout/quote?pin=' + encodeURIComponent(pin));
+      const result = await response.json();
+      if (request !== quoteRequest.current) return;
+      if (!response.ok || (result.fee !== null && (!Number.isSafeInteger(result.fee) || result.fee < 0))) {
+        throw new Error('Invalid delivery quote');
+      }
+      if (result.fee === null) {
+        setError('Delivery unavailable for this PIN code.');
+        return;
+      }
+      setQuote({ pin, fee: result.fee });
+    } catch {
+      if (request === quoteRequest.current) setError('Could not check delivery. Try again.');
+    }
+  }
+
   async function handlePay() {
+    if (!/^[6-9][0-9]{9}$/.test(details.mobile)) {
+      setError('Enter a 10-digit Indian mobile number starting with 6, 7, 8 or 9.');
+      return;
+    }
     setError('');
     setLoading(true);
 
@@ -87,7 +116,7 @@ export function CheckoutButton({
 
       const { keyId, razorpayOrderId, amount, currency: orderCurrency, orderNumber } = createData.data;
 
-      if (fee === null || amount !== Math.round(total * 100) + fee) {
+      if (fee === null || orderCurrency !== currency || amount !== toRazorpayAmount(total + fee / 100, currency)) {
         setError('Pricing changed. Refresh checkout to review the new total.');
         setLoading(false);
         return;
@@ -155,17 +184,20 @@ export function CheckoutButton({
     <div className="space-y-3">
       {([['recipientName', 'Full name'], ['mobile', 'Mobile number'], ['address', 'Complete delivery address'], ['pinCode', 'PIN code']] as const).map(([key, label]) => (
         <label key={key} className="block text-sm">{label}
-          <input className="block w-full rounded border p-2" value={details[key]} onChange={e => setDetails({ ...details, [key]: e.target.value })} />
+          <input className="block w-full rounded border p-2" disabled={loading} value={details[key]} onChange={(event) => {
+            if (key === 'pinCode') {
+              quoteRequest.current++;
+              setQuote(null);
+              setError('');
+            }
+            const value = event.target.value;
+            setDetails({ ...details, [key]: value });
+            if (key === 'pinCode' && /^[1-9][0-9]{5}$/.test(value)) void checkDelivery(value);
+          }} />
         </label>
       ))}
-      <button type="button" onClick={async () => {
-        try {
-          const response = await fetch('/api/checkout/quote?pin=' + encodeURIComponent(details.pinCode));
-          const result = await response.json();
-          setQuote({ pin: details.pinCode, fee: result.fee });
-          setError(result.fee === null ? 'Delivery unavailable for this PIN code.' : '');
-        } catch { setQuote(null); setError('Could not check delivery. Try again.'); }
-      }}>Check delivery</button>
+      <button type="button" disabled={loading} className="rounded-lg border px-4 py-2 font-semibold" onClick={() => checkDelivery()}>Check delivery</button>
+      {fee === null && !error && <p className="text-sm text-slate-600">Enter a six-digit PIN to check delivery and enable payment.</p>}
       {fee !== null && <p>Delivery {formatPrice(fee / 100, currency)}</p>}
       {error ? (
         <Alert tone="error" role="alert">

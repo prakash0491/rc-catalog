@@ -12,7 +12,7 @@ export async function Footer() {
       <Container className="grid gap-10 py-16 md:grid-cols-[1.25fr_0.8fr_0.9fr_0.9fr] lg:py-20">
         <Stack gap="lg">
           <Link href="/" className="flex items-center gap-3 text-white" aria-label={`${businessProfile.name} home`}>
-            <span className="grid h-14 w-14 place-items-center rounded-full border-2 border-white text-2xl font-black">Q</span>
+            <span className="grid h-14 w-14 place-items-center rounded-full border-2 border-white text-2xl font-black">VG</span>
             <span className="leading-none">
               <span className="block text-lg font-black uppercase tracking-tight">{businessProfile.name}</span>
               <span className="block text-xs font-semibold uppercase tracking-[0.25em] text-white/50">Store</span>

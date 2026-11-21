@@ -8,7 +8,7 @@ import { createCheckoutOrder } from '@/lib/orders';
 import { RazorpayConfigError } from '@/lib/razorpay';
 
 import { z } from 'zod';
-import { deliveryFeePaise } from '@/lib/delivery';
+import { configuredDeliveryFee } from '@/lib/configured-delivery';
 
 const destination = z.object({
   recipientName: z.string().trim().min(2).max(120),
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
     const parsed = destination.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json(buildApiError('Check your delivery details.', 'INVALID_ADDRESS'), { status: 400 });
-    const fee = deliveryFeePaise(parsed.data.pinCode);
+    const fee = await configuredDeliveryFee(parsed.data.pinCode);
     if (fee === null) return NextResponse.json(buildApiError('Delivery unavailable for this PIN code.', 'UNSUPPORTED_PIN'), { status: 422 });
     const result = await createCheckoutOrder(session, { ...parsed.data, deliveryFee: fee / 100 });
 

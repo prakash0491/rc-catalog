@@ -16,7 +16,7 @@ export default defineConfig({
     restoreMocks: true,
     coverage: {
       provider: 'v8',
-      include: ['src/lib/**/*.{ts,tsx}', 'src/components/**/*.{ts,tsx}', 'src/app/api/**/route.ts', 'middleware.ts'],
+      include: ['src/lib/**/*.{ts,tsx}', 'src/components/**/*.{ts,tsx}', 'src/app/api/**/route.ts', 'src/middleware.ts'],
       reporter: ['text', 'json-summary', 'html'],
     },
   },

@@ -17,7 +17,7 @@ export async function CategoriesSection() {
         <div className="mb-9 flex items-end justify-between gap-6">
           <div>
             <Text variant="caption" className="mb-3 font-bold tracking-[0.28em] text-slate-400">
-              Youcliq categories
+              VISH GARAGE categories
             </Text>
             <Heading as="h2" size="h1" className="text-slate-950">
               Shop by Category

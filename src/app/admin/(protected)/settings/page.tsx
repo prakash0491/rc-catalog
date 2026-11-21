@@ -14,9 +14,11 @@ export default async function AdminSettingsPage() {
         <Text variant="muted" className="mt-2">Manage public company details, social links, and SEO defaults.</Text>
       </div>
 
+      <a href="/admin/security" className="underline">Authenticator and password settings</a>
       <SettingsForm
         initialValues={{
-          businessName: settings?.businessName ?? 'RC Catalog',
+          deliveryRates: settings?.deliveryRates ?? Object.entries(JSON.parse(process.env.DELIVERY_FEES_PAISE || '{}')).map(([pin, fee]) => pin + ' ' + Number(fee) / 100).join('\n'),
+          businessName: settings?.businessName ?? 'VISH GARAGE',
           logo: settings?.logo ?? '',
           phone: settings?.phone ?? '',
           email: settings?.email ?? '',

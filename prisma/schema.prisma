@@ -163,6 +163,7 @@ model Inquiry {
 }
 
 model BusinessSettings {
+  deliveryRates String?
   id             String   @id @default(cuid())
   businessName   String   @db.VarChar(160)
   logo           String?
@@ -181,6 +182,9 @@ model BusinessSettings {
 }
 
 model Admin {
+  otpSecret String?
+  otpStep Int @default(0)
+  otpAttempt DateTime?
   id           String   @id @default(cuid())
   name         String?  @db.VarChar(120)
   email        String   @unique @db.VarChar(255)

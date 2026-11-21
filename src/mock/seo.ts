@@ -9,7 +9,7 @@ export interface SeoConfig {
 }
 
 export const seoConfig: SeoConfig = {
-  siteName: 'Northstar Commerce',
+  siteName: 'VISH GARAGE',
   defaultTitle: 'Modern Product Catalog',
   description: 'A reusable product catalog platform for showcasing products with elegance and clarity.',
   keywords: ['catalog', 'products', 'storefront', 'modern commerce', 'ecommerce'],

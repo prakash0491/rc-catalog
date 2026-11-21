@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const db = vi.hoisted(() => ({ product: { findMany: vi.fn(), findFirst: vi.fn(), count: vi.fn() }, category: { findMany: vi.fn() } }));
 vi.mock('@/lib/prisma', () => ({ prisma: db }));
-import { getPublicProductBySlug, listPublicProducts, parseProductListQuery } from '@/lib/products';
+import { getProductSearchSuggestions, getPublicProductBySlug, listPublicProducts, parseProductListQuery } from '@/lib/products';
 import { normalizeProductForUi, type ProductApiItem } from '@/lib/products-api';
 beforeEach(() => {
   vi.resetAllMocks();
@@ -29,6 +29,22 @@ describe('public catalog visibility', () => {
     db.product.findFirst.mockResolvedValue(null);
     expect(await getPublicProductBySlug('missing')).toBeNull();
     expect(db.product.findFirst).toHaveBeenCalledWith(expect.objectContaining({ include: expect.objectContaining({ variants: expect.objectContaining({ where: { isActive: true } }) }) }));
+  });
+  it('matches category names and brand specifications in listings and suggestions', async () => {
+    await listPublicProducts({ page: 1, limit: 12, search: 'Drift' });
+    await getProductSearchSuggestions('Drift');
+
+    const match = { contains: 'Drift', mode: 'insensitive' };
+    expect(db.product.findMany).toHaveBeenCalledTimes(2);
+    for (const [query] of db.product.findMany.mock.calls) {
+      expect(query.where).toMatchObject({
+        category: { isActive: true },
+        OR: expect.arrayContaining([
+          { category: { name: match } },
+          { specifications: { some: { name: { equals: 'brand', mode: 'insensitive' }, value: match } } },
+        ]),
+      });
+    }
   });
   it('provides a fallback for an empty image array', () => {
     const item = { id: 'p', price: 19.99, images: [] } as unknown as ProductApiItem;

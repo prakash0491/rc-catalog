@@ -99,6 +99,7 @@ async function loadCheckoutCartRaw(guestSessionId: string): Promise<{
               isActive: true,
               status: true,
               deletedAt: true,
+              category: { select: { isActive: true } },
               images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { url: true } },
             },
           },
@@ -130,7 +131,7 @@ async function loadCheckoutCartRaw(guestSessionId: string): Promise<{
     const product = item.product;
     const variant = item.variant;
 
-    if (!product.isActive || product.status !== 'PUBLISHED' || product.deletedAt !== null) {
+    if (!product.isActive || product.status !== 'PUBLISHED' || product.deletedAt !== null || !product.category.isActive) {
       unavailable = 'This product is no longer available.';
     } else if (item.variantId && (!variant || !variant.isActive)) {
       unavailable = 'This option is no longer available.';
@@ -364,6 +365,13 @@ export async function createCheckoutOrder(guestSessionId: string, delivery: Deli
     });
 
     return created;
+  }).catch(async (error: unknown) => {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+
+    // Another request may have saved the same checkout while Razorpay was creating our order.
+    const concurrentOrder = await findReusablePendingOrder(guestSessionId, checkoutKey, raw);
+    if (!concurrentOrder) throw error;
+    return concurrentOrder.order;
   });
 
   return {
@@ -463,13 +471,23 @@ export async function finalizePaidOrder(params: {
           throw new Error('STOCK_CONFLICT');
         }
       } else {
-        const updated = await tx.product.updateMany({
+        const [product] = await tx.product.updateManyAndReturn({
           where: { id: item.productId, stockQuantity: { gte: item.quantity } },
           data: { stockQuantity: { decrement: item.quantity } },
+          select: { stockQuantity: true, lowStockThreshold: true, stockStatus: true },
         });
 
-        if (updated.count === 0) {
+        if (!product) {
           throw new Error('STOCK_CONFLICT');
+        }
+
+        const stockStatus = product.stockQuantity === 0
+          ? 'OUT_OF_STOCK'
+          : product.stockQuantity <= product.lowStockThreshold || product.stockStatus === 'LOW_STOCK'
+            ? 'LOW_STOCK'
+            : 'IN_STOCK';
+        if (stockStatus !== product.stockStatus) {
+          await tx.product.update({ where: { id: item.productId }, data: { stockStatus } });
         }
       }
     }

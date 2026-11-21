@@ -223,7 +223,7 @@ export function ProductCatalog({
         <>
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {products.map((product) => (
-              <BaseCard key={product.id} className="group flex h-full flex-col overflow-hidden p-0">
+              <BaseCard key={product.id} className="group relative isolate flex h-full flex-col overflow-hidden p-0">
                 <div className="relative h-64 overflow-hidden bg-white">
                   <Image src={product.images[0]} alt={product.name} fill className="object-contain p-7 transition duration-500 group-hover:scale-110" />
                   <div className="absolute left-4 top-4 flex flex-wrap gap-2">
@@ -247,7 +247,7 @@ export function ProductCatalog({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <Heading as="h3" size="h5" className="line-clamp-2 min-h-[44px]">{product.name}</Heading>
-                      <Link href={`/products?category=${product.categorySlug}`} className="text-sm text-slate-500 transition hover:text-slate-900">
+                      <Link href={`/products?category=${product.categorySlug}`} className="relative z-10 text-sm text-slate-500 transition hover:text-slate-900">
                         {product.categoryName}
                       </Link>
                     </div>
@@ -255,10 +255,10 @@ export function ProductCatalog({
                   </div>
                   <Text variant="muted" className="line-clamp-2">{product.shortDescription}</Text>
                   <div className="mt-auto flex flex-wrap gap-3">
-                    <Link href={`/products/${product.slug}`}>
-                      <PrimaryButton type="button">View details</PrimaryButton>
+                    <Link href={`/products/${product.slug}`} aria-label={`View details for ${product.name}`} className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white after:absolute after:inset-0 after:z-[1]">
+                      View details
                     </Link>
-                    <a href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Hi, I'm interested in ${product.name}`)}`} target="_blank" rel="noreferrer">
+                    <a className="relative z-10" href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Hi, I'm interested in ${product.name}`)}`} target="_blank" rel="noreferrer">
                       <SecondaryButton type="button">WhatsApp</SecondaryButton>
                     </a>
                   </div>

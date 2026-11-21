@@ -1,15 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Prisma } from '@prisma/client';
 
 const db = vi.hoisted(() => ({
   product: { findFirst: vi.fn() },
   productVariant: { findFirst: vi.fn() },
   cartItem: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
+  $transaction: vi.fn(),
 }));
 vi.mock('@/lib/prisma', () => ({ prisma: db }));
 import { addItemToCart, removeCartItem, updateCartItemQuantity } from '@/lib/cart';
 
 beforeEach(() => {
   vi.resetAllMocks();
+  db.$transaction.mockImplementation((callback) => callback(db));
   db.product.findFirst.mockResolvedValue({ stockQuantity: 5 });
   db.productVariant.findFirst.mockResolvedValue({ stockQuantity: 3 });
   db.cartItem.findFirst.mockResolvedValue(null);
@@ -23,6 +26,24 @@ describe('cart additions', () => {
   it('rejects unpublished or missing products', async () => {
     db.product.findFirst.mockResolvedValue(null);
     await expect(addItemToCart('c', 'p', null, 1)).rejects.toThrow('PRODUCT_NOT_FOUND');
+  });
+  it('only allows products in active categories', async () => {
+    await addItemToCart('cart', 'product', null, 1);
+    expect(db.product.findFirst).toHaveBeenCalledWith({
+      where: { id: 'product', isActive: true, status: 'PUBLISHED', deletedAt: null, category: { isActive: true } },
+    });
+  });
+  it('rechecks combined stock after a concurrent add changes the cart', async () => {
+    db.$transaction.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError('Write conflict', {
+      code: 'P2034', clientVersion: 'test',
+    }));
+    db.cartItem.findFirst.mockResolvedValue({ id: 'line', quantity: 4 });
+
+    await expect(addItemToCart('cart', 'product', null, 2)).rejects.toThrow('INSUFFICIENT_STOCK');
+    expect(db.$transaction).toHaveBeenCalledTimes(2);
+    expect(db.$transaction).toHaveBeenLastCalledWith(expect.any(Function), { isolationLevel: 'Serializable' });
+    expect(db.cartItem.create).not.toHaveBeenCalled();
+    expect(db.cartItem.update).not.toHaveBeenCalled();
   });
   it.each([0, -1, 1.5, NaN, Infinity])('rejects invalid quantity %s', async (quantity) => {
     await expect(addItemToCart('c', 'p', null, quantity)).rejects.toThrow('INVALID_QUANTITY');

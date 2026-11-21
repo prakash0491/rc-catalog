@@ -46,9 +46,6 @@ export async function FeaturedProductsSection() {
                   <span className="absolute left-4 top-4 rounded-full bg-slate-950 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white">
                     {product.newArrival ? 'New' : 'Featured'}
                   </span>
-                  <div className="absolute right-4 top-4">
-                    <IconButton icon={<span aria-hidden="true">W</span>} label={`Wishlist ${product.name}`} className="bg-white/95" />
-                  </div>
                 </div>
                 <Stack gap="sm" className="flex-1 p-5">
                   <Heading as="h3" size="h5" className="line-clamp-2 min-h-[44px] text-slate-950">

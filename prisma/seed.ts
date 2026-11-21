@@ -264,7 +264,7 @@ const offers = [
 
 const businessSettings = {
   id: 'business-default',
-  businessName: 'RC Catalog',
+  businessName: 'VISH GARAGE',
   logo: '/images/logo.svg',
   phone: '+1 555 0100',
   email: 'hello@rccatalog.com',
@@ -274,7 +274,7 @@ const businessSettings = {
   youtube: 'https://youtube.com/@rccatalog',
   address: '123 Market Street, San Francisco, CA',
   businessHours: 'Mon-Sat 9:00 AM - 6:00 PM',
-  seoTitle: 'RC Catalog',
+  seoTitle: 'VISH GARAGE',
   seoDescription: 'A reusable product catalog platform built for modern commerce.',
 } as const;
 

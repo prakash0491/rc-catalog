@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 
 import { ResponsiveContainer, SectionContainer } from '@/components/common';
@@ -45,6 +46,7 @@ function computeItemPrice(product: CartItem['product'], variant: CartItem['varia
 }
 
 export default function CartPage() {
+  const router = useRouter();
   const [cart, setCart] = useState<Cart>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -97,6 +99,7 @@ export default function CartPage() {
       }
 
       await fetchCart();
+      router.refresh();
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : 'Unable to update the quantity.');
     } finally {
@@ -116,6 +119,7 @@ export default function CartPage() {
       }
 
       await fetchCart();
+      router.refresh();
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : 'Unable to remove this item.');
     } finally {
@@ -200,7 +204,7 @@ export default function CartPage() {
                           <button
                             type="button"
                             onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                            disabled={updating === item.id}
+                            disabled={updating !== null}
                             className="grid h-8 w-8 place-items-center rounded-full text-slate-600 transition hover:bg-slate-50 disabled:opacity-30"
                             aria-label="Decrease quantity"
                           >
@@ -212,7 +216,7 @@ export default function CartPage() {
                           <button
                             type="button"
                             onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                            disabled={updating === item.id}
+                            disabled={updating !== null}
                             className="grid h-8 w-8 place-items-center rounded-full text-slate-600 transition hover:bg-slate-50 disabled:opacity-30"
                             aria-label="Increase quantity"
                           >
@@ -228,7 +232,7 @@ export default function CartPage() {
                             icon={<Trash2 className="h-4 w-4 text-rose-500" />}
                             label={`Remove ${item.product.name} from cart`}
                             onClick={() => handleRemoveItem(item.id)}
-                            disabled={updating === item.id}
+                            disabled={updating !== null}
                             className="h-8 w-8 border-rose-200 hover:border-rose-300"
                           />
                         </div>

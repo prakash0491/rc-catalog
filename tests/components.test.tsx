@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import type { ImgHTMLAttributes } from 'react';
 
@@ -14,6 +14,7 @@ import { AddToCartButton } from '@/components/product/add-to-cart-button';
 import { CheckoutButton } from '@/components/checkout/checkout-button';
 import { ProductPurchaseOptions } from '@/components/product/product-purchase-options';
 import { EmptyState } from '@/components/ui';
+import CartPage from '@/app/cart/page';
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
@@ -62,6 +63,56 @@ describe('checkout display', () => {
   it('shows the precise charge and respects unavailable items', () => {
     render(<CheckoutButton total={19.99} currency="INR" businessName="RC" disabled />);
     expect(screen.getByRole('button', { name: 'Pay ₹19.99' })).toBeDisabled();
+  });
+
+  it('ignores an earlier delivery response that arrives after the current quote', async () => {
+    const pending = Promise.withResolvers<Response>();
+    vi.stubGlobal('fetch', vi.fn()
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce(Response.json({ fee: 5000 })));
+    render(<CheckoutButton total={100} currency="INR" businessName="RC" />);
+
+    const pin = screen.getByLabelText('PIN code');
+    fireEvent.change(pin, { target: { value: '50001' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check delivery' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('six-digit');
+    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.change(pin, { target: { value: '560001' } });
+    fireEvent.change(pin, { target: { value: '560002' } });
+    expect(await screen.findByRole('button', { name: 'Pay ₹150' })).toBeEnabled();
+
+    await act(async () => pending.resolve(Response.json({ fee: null })));
+    expect(screen.getByRole('button', { name: 'Pay ₹150' })).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('keeps payment disabled when the delivery endpoint returns an invalid response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'unavailable' }, { status: 503 })));
+    render(<CheckoutButton total={100} currency="INR" businessName="RC" />);
+    fireEvent.change(screen.getByLabelText('PIN code'), { target: { value: '560001' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check delivery' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not check delivery.');
+    expect(screen.getByRole('button', { name: 'Pay ₹100' })).toBeDisabled();
+  });
+});
+
+describe('shopping cart', () => {
+  it('refreshes the header after removing the last item', async () => {
+    router.refresh.mockClear();
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(Response.json({ success: true, data: { cart: { id: 'cart', items: [{
+        id: 'item', productId: 'car', variantId: null, quantity: 1, variant: null,
+        product: { id: 'car', slug: 'rc-car', name: 'RC car', price: 100, images: [] },
+      }] } } }))
+      .mockResolvedValueOnce(Response.json({ success: true, data: { removed: true } }))
+      .mockResolvedValueOnce(Response.json({ success: true, data: { cart: { id: 'cart', items: [] } } })));
+    render(<CartPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove RC car from cart' }));
+
+    expect(await screen.findByText('Your cart is empty')).toBeInTheDocument();
+    expect(router.refresh).toHaveBeenCalledOnce();
   });
 });
 

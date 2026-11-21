@@ -51,22 +51,39 @@ export type CartWithItems = Awaited<ReturnType<typeof getOrCreateCustomerCart>>;
 // ─── Add to cart ─────────────────────────────────────────────
 
 export async function addItemToCart(cartId: string, productId: string, variantId: string | null, quantity: number) {
-  // Validate product visibility
-  const product = await prisma.product.findFirst({
-    where: { id: productId, isActive: true, status: 'PUBLISHED', deletedAt: null },
+  if (!Number.isSafeInteger(quantity) || quantity < 1) {
+    throw new Error('INVALID_QUANTITY');
+  }
+
+  // A serializable transaction also protects base products, whose null variantId
+  // does not participate in PostgreSQL's composite uniqueness check.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await prisma.$transaction(
+        (tx) => addCartLine(tx, cartId, productId, variantId, quantity),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (attempt >= 3 || !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+          (error.code !== 'P2034' && error.code !== 'P2002')) {
+        throw error;
+      }
+    }
+  }
+}
+
+async function addCartLine(tx: Prisma.TransactionClient, cartId: string, productId: string, variantId: string | null, quantity: number) {
+  const product = await tx.product.findFirst({
+    where: { id: productId, isActive: true, status: 'PUBLISHED', deletedAt: null, category: { isActive: true } },
   });
 
   if (!product) {
     throw new Error('PRODUCT_NOT_FOUND');
   }
 
-  if (!Number.isSafeInteger(quantity) || quantity < 1) {
-    throw new Error('INVALID_QUANTITY');
-  }
-
   let availableStock = product.stockQuantity;
   if (variantId) {
-    const variant = await prisma.productVariant.findFirst({
+    const variant = await tx.productVariant.findFirst({
       where: { id: variantId, productId, isActive: true },
     });
 
@@ -78,7 +95,7 @@ export async function addItemToCart(cartId: string, productId: string, variantId
   }
 
   // Check for existing item
-  const existing = await prisma.cartItem.findFirst({
+  const existing = await tx.cartItem.findFirst({
     where: { cartId, productId, variantId },
   });
 
@@ -86,13 +103,10 @@ export async function addItemToCart(cartId: string, productId: string, variantId
     if (existing.quantity + quantity > availableStock) {
       throw new Error('INSUFFICIENT_STOCK');
     }
-    return prisma.cartItem.update({
+    return tx.cartItem.update({
       where: { id: existing.id },
       data: { quantity: existing.quantity + quantity },
-      include: {
-        product: { select: { id: true, slug: true, name: true, price: true, mrp: true, stockQuantity: true, stockStatus: true, images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { url: true } } } },
-        variant: { select: { id: true, optionName: true, optionValue: true, priceOverride: true } },
-      },
+      include: CART_ITEMS_INCLUDE.items.include,
     });
   }
 
@@ -100,12 +114,9 @@ export async function addItemToCart(cartId: string, productId: string, variantId
     throw new Error('INSUFFICIENT_STOCK');
   }
 
-  return prisma.cartItem.create({
+  return tx.cartItem.create({
     data: { cartId, productId, variantId, quantity },
-    include: {
-      product: { select: { id: true, slug: true, name: true, price: true, mrp: true, stockQuantity: true, stockStatus: true, images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { url: true } } } },
-      variant: { select: { id: true, optionName: true, optionValue: true, priceOverride: true } },
-    },
+    include: CART_ITEMS_INCLUDE.items.include,
   });
 }
 

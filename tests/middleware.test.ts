@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { middleware } from '../middleware';
+import { middleware } from '@/middleware';
 import { signAdminSession } from '@/lib/auth/jwt';
 import { signCustomerSession } from '@/lib/auth/customer-jwt';
 import { ADMIN_AUTH_COOKIE } from '@/lib/auth/constants';
@@ -11,6 +11,9 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('page access control', () => {
+  it.each(['/api/auth/login', '/api/wishlist', '/api/orders/example'])('disables the legacy customer API at %s', async (path) => {
+    expect((await middleware(new NextRequest(`http://localhost${path}`))).status).toBe(410);
+  });
   it.each(['/admin/login', '/admin/api/login', '/admin/api/logout', '/products', '/checkout'])('allows public page %s', async (path) => {
     expect((await middleware(new NextRequest(`http://localhost${path}`))).status).toBe(200);
   });
